@@ -576,14 +576,10 @@ def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str
         return False
 
 
-if __name__ == "__main__":
-    # Part-1 Download Songs by Album ID
-
+def download_album():
     index_ids = []
-
     # index_ids = [4, 6, 15, 18, 19]
-
-    album_metadata = get_song_ids_by_album_id("490028")
+    album_metadata = get_song_ids_by_album_id("191657132")
     index = 0
     for song_id in album_metadata['song_ids']:
         song_detail = album_metadata['song_details'][index]
@@ -596,20 +592,27 @@ if __name__ == "__main__":
                 metadata = get_song_metadata_by_song_id(song_id, "lossless")
                 download_song_and_resources(metadata, idx=song_index)
             else:
-               logger.info(f"{song_index} is not in the {index_ids}, skipping downloading...")
+                logger.info(f"{song_index} is not in the {index_ids}, skipping downloading...")
         else:
             metadata = get_song_metadata_by_song_id(song_id, "lossless")
             download_song_and_resources(metadata, idx=song_index)
         index += 1
 
 
-    # Part-2 Download Song by Song ID
+def download_song():
     # https://music.163.com/song?id=473602689
+    song_idx = None
+    metadata = get_song_metadata_by_song_id("1967736133", "lossless")
+    # song_idx = 91
+    download_song_and_resources(metadata, idx=song_idx)
 
-    # song_idx = None
-    # metadata = get_song_metadata_by_song_id("461592210", "lossless")
-    #
-    # # song_idx = 91
-    # download_song_and_resources(metadata, idx=song_idx)
+
+if __name__ == "__main__":
+
+    # Part-1 Download Songs by Album ID
+    download_album()
+
+    # Part-2 Download Song by Song ID
+    # download_song()
 
     pass
