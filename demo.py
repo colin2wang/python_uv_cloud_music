@@ -309,6 +309,7 @@ def write_metadata_to_file(file_path: str, metadata: Dict[str, Any]) -> bool:
         album = metadata.get('al_name', '')
         lyric = metadata.get('lyric', '')
         cover_path = metadata.get('cover_path', '')
+        track_number = metadata.get('track_number', '')
         
         logger.info(f"🏷️  正在写入元数据到 {os.path.basename(file_path)}...")
         
@@ -330,6 +331,11 @@ def write_metadata_to_file(file_path: str, metadata: Dict[str, Any]) -> bool:
             
             # 年份
             audio_file.add(TYER(encoding=3, text=str(time.localtime().tm_year)))
+            
+            # 轨道号
+            if track_number:
+                from mutagen.id3 import TRCK
+                audio_file.add(TRCK(encoding=3, text=track_number))
             
             # 注释（歌词）
             if lyric:
@@ -364,6 +370,8 @@ def write_metadata_to_file(file_path: str, metadata: Dict[str, Any]) -> bool:
                 audio_file['ALBUM'] = album
             if lyric:
                 audio_file['LYRICS'] = lyric[:1000]
+            if track_number:
+                audio_file['TRACKNUMBER'] = track_number
             
             # 添加封面
             if cover_path and os.path.exists(cover_path):
@@ -395,6 +403,8 @@ def write_metadata_to_file(file_path: str, metadata: Dict[str, Any]) -> bool:
                 mp4_tags['\xa9alb'] = album      # Album
             if lyric:
                 mp4_tags['\xa9lyr'] = lyric[:1000]  # Lyrics
+            if track_number:
+                mp4_tags['trkn'] = [(int(track_number), 0)]  # Track number for MP4
             
             # 添加封面
             if cover_path and os.path.exists(cover_path):
@@ -420,7 +430,7 @@ def write_metadata_to_file(file_path: str, metadata: Dict[str, Any]) -> bool:
         return False
 
 
-def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str = "downloads") -> bool:
+def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str = "downloads", idx: int = None) -> bool:
     """
     下载歌曲文件和相关资源(歌词、封面)
     
@@ -475,7 +485,12 @@ def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str
                             file_extension = ext_from_v
         
         # 构造文件名
-        filename = f"{safe_artist} - {safe_song_name}"
+        if idx is not None:
+            # 如果提供了索引，格式化为3位数字（不足前面补0）
+            formatted_index = f"{idx:03d}"
+            filename = f"{formatted_index} - {safe_artist} - {safe_song_name}"
+        else:
+            filename = f"{safe_artist} - {safe_song_name}"
         music_file_path = os.path.join(download_dir, f"{filename}{file_extension}")
         lyric_file_path = os.path.join(download_dir, f"{filename}.lrc")
         cover_file_path = os.path.join(download_dir, f"{filename}.jpg")
@@ -504,12 +519,16 @@ def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str
             logger.error(f"❌ 音乐文件下载失败: {str(e)}")
             return False
         
-        # 将封面路径传递给元数据
+        # 将封面路径和轨道号传递给元数据
         metadata_for_tagging = data.copy()
         if os.path.exists(cover_file_path):
             metadata_for_tagging['cover_path'] = cover_file_path
         else:
             metadata_for_tagging['cover_path'] = ''
+        
+        # 添加轨道号信息
+        if idx is not None:
+            metadata_for_tagging['track_number'] = str(idx)
         
         # 写入元数据到音频文件
         logger.info("\n🏷️  正在写入元数据...")
@@ -559,18 +578,38 @@ def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str
 
 if __name__ == "__main__":
     # Part-1 Download Songs by Album ID
-    album_metadata = get_song_ids_by_album_id("174073750")
-    index = 1
+
+    index_ids = []
+
+    # index_ids = [4, 6, 15, 18, 19]
+
+    album_metadata = get_song_ids_by_album_id("490028")
+    index = 0
     for song_id in album_metadata['song_ids']:
-        logger.info(f"{index}. {album_metadata['song_details'][index - 1]}")
-        metadata = get_song_metadata_by_song_id(song_id, "lossless")
-        download_song_and_resources(metadata)
+        song_detail = album_metadata['song_details'][index]
+        song_index = song_detail['index']
+        logger.info(f"{index + 1}. {song_detail}")
+
+        if len(index_ids) > 0:
+            if song_index in index_ids:
+                logger.info(f"{song_index} is in the {index_ids}, continue downloading...")
+                metadata = get_song_metadata_by_song_id(song_id, "lossless")
+                download_song_and_resources(metadata, idx=song_index)
+            else:
+               logger.info(f"{song_index} is not in the {index_ids}, skipping downloading...")
+        else:
+            metadata = get_song_metadata_by_song_id(song_id, "lossless")
+            download_song_and_resources(metadata, idx=song_index)
         index += 1
 
+
     # Part-2 Download Song by Song ID
-    # https://music.163.com/song?id=19284114&uct2=U2FsdGVkX1+kbTi6ka5LFDDLHfTMezYxOxUoKMOzuvg=
-    # metadata = get_song_metadata_by_song_id("19284114", "lossless")
+    # https://music.163.com/song?id=473602689
+
+    # song_idx = None
+    # metadata = get_song_metadata_by_song_id("461592210", "lossless")
     #
-    # download_song_and_resources(metadata)
+    # # song_idx = 91
+    # download_song_and_resources(metadata, idx=song_idx)
 
     pass
