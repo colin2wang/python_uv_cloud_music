@@ -1,5 +1,9 @@
+# Python
 .venv/
 
+# PyCharm
 .idea/
 
+# Folders
 downloads/
+logs/
