@@ -120,7 +120,7 @@ def setup_logger(name: str = None, level: str = 'INFO') -> logging.Logger:
 # ==========================================
 if __name__ == "__main__":
     # Example usage
-    log = get_default_logger("test_logger", level="DEBUG")
+    log = setup_logger("test_logger", level="DEBUG")
 
     print(f"Project Root detected as: {PROJECT_ROOT}")
 
