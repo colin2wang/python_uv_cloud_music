@@ -1,74 +1,128 @@
 import logging
-import os
+import sys
 from datetime import datetime
+from pathlib import Path
 
-def setup_logger(name: str = __name__, log_level: str = "INFO") -> logging.Logger:
+
+# ==========================================
+# Root Directory Detection
+# ==========================================
+def get_project_root() -> Path:
     """
-    配置并返回一个日志记录器
-    
+    Attempts to determine the project root directory by searching
+    upward for common project markers (.git, requirements.txt, etc).
+
+    If no marker is found, falls back to the current working directory.
+    """
+    current_path = Path(__file__).resolve().parent
+
+    # List of files/directories that indicate the root of a project
+    markers = ['.git', 'pyproject.toml', 'requirements.txt', 'setup.py', '.env']
+
+    # Traverse up the directory tree
+    for _ in range(10):  # Limit recursion depth
+        for marker in markers:
+            if (current_path / marker).exists():
+                return current_path
+
+        parent = current_path.parent
+        if parent == current_path:
+            # Reached file system root without finding a marker
+            break
+        current_path = parent
+
+    # Fallback: use the directory where the script was executed
+    return Path.cwd()
+
+
+# ==========================================
+# Global Configuration
+# ==========================================
+
+# 1. Determine Project Root
+PROJECT_ROOT = get_project_root()
+
+# 2. Define Log Directory (Always in project_root/logs)
+LOG_DIR = PROJECT_ROOT / 'logs'
+
+# 3. Create Directory if it doesn't exist
+try:
+    LOG_DIR.mkdir(exist_ok=True)
+except OSError as e:
+    # Use sys.stderr because logger isn't ready yet
+    sys.stderr.write(f"Error creating log directory at {LOG_DIR}: {e}\n")
+
+# 4. Generate Unique Filename (One per run)
+_timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+LOG_FILE_NAME = f"run_{_timestamp}.log"
+LOG_FILE_PATH = LOG_DIR / LOG_FILE_NAME
+
+# 5. Define Formats
+LOG_FORMAT = "%(asctime)s - [%(levelname)s] - %(name)s - %(message)s"
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+
+def setup_logger(name: str = None, level: str = 'INFO') -> logging.Logger:
+    """
+    Initializes and returns a logger with console and file handlers.
+    The log file is always located in {PROJECT_ROOT}/logs/.
+
     Args:
-        name: 日志记录器名称
-        log_level: 日志级别 (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-    
+        name (str): Logger name (usually __name__).
+        level (str): Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL).
+
     Returns:
-        配置好的 Logger 对象
+        logging.Logger: Configured logger.
     """
-    # 创建日志记录器
+
+    # Initialize logger
     logger = logging.getLogger(name)
-    
-    # 避免重复添加处理器
-    if logger.handlers:
-        return logger
-    
-    # 设置日志级别
-    log_level = getattr(logging, log_level.upper(), logging.INFO)
+
+    # Set Level
+    level_upper = level.upper()
+    log_level = getattr(logging, level_upper, logging.INFO)
     logger.setLevel(log_level)
-    
-    # 创建控制台处理器
-    console_handler = logging.StreamHandler()
+
+    # Prevent adding duplicate handlers if function is called repeatedly
+    if logger.hasHandlers():
+        return logger
+
+    # Create Formatter
+    formatter = logging.Formatter(fmt=LOG_FORMAT, datefmt=DATE_FORMAT)
+
+    # --- Handler 1: Console (Standard Output) ---
+    console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(log_level)
-    
-    # 创建格式化器
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
     console_handler.setFormatter(formatter)
-    
-    # 添加处理器到记录器
     logger.addHandler(console_handler)
-    
-    # 创建文件处理器（可选）
+
+    # --- Handler 2: File (Project Root/logs) ---
     try:
-        # 创建 logs 目录
-        log_dir = "logs"
-        os.makedirs(log_dir, exist_ok=True)
-        
-        # 生成日志文件名 - 使用完整时间戳确保每次运行都是新文件
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        log_filename = f"cloud_music_{timestamp}.log"
-        log_filepath = os.path.join(log_dir, log_filename)
-        
-        # 创建文件处理器
-        file_handler = logging.FileHandler(log_filepath, encoding='utf-8')
+        # Convert Path object to string for FileHandler
+        file_path_str = str(LOG_FILE_PATH)
+        file_handler = logging.FileHandler(file_path_str, encoding='utf-8')
         file_handler.setLevel(log_level)
         file_handler.setFormatter(formatter)
-        
-        # 添加文件处理器
         logger.addHandler(file_handler)
     except Exception as e:
-        logger.warning(f"无法创建文件日志处理器: {e}")
-    
+        # Fallback if file writing fails
+        sys.stderr.write(f"Failed to initialize file handler: {e}\n")
+
+    # Optional: Log the absolute path on initialization for debugging
+    if name is None or name == "__main__":
+        logger.debug(f"Log file initialized at: {LOG_FILE_PATH}")
+
     return logger
 
-# 创建默认的日志记录器
-logger = setup_logger(__name__)
 
+# ==========================================
+# Usage Example
+# ==========================================
 if __name__ == "__main__":
-    # 测试日志功能
-    test_logger = setup_logger("test")
-    test_logger.debug("这是调试信息")
-    test_logger.info("这是普通信息")
-    test_logger.warning("这是警告信息")
-    test_logger.error("这是错误信息")
-    test_logger.critical("这是严重错误信息")
+    # Example usage
+    log = get_default_logger("test_logger", level="DEBUG")
+
+    print(f"Project Root detected as: {PROJECT_ROOT}")
+
+    log.info("This message \n goes to console \n and the log file \n in root/logs.")
+    log.warning(f"Check the file: {LOG_FILE_PATH}")
