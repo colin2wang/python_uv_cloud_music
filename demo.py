@@ -554,7 +554,7 @@ def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str
             logger.info("🖼️  正在下载封面...")
             random_sleep()
             try:
-                cover_response = requests.get(cover_url + '?param=512x512', timeout=10)
+                cover_response = requests.get(cover_url + '?param=320x320', timeout=10)
                 cover_response.raise_for_status()
                 
                 with open(cover_file_path, 'wb') as f:
@@ -579,7 +579,7 @@ def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str
 def download_album():
     index_ids = []
     # index_ids = [4, 6, 15, 18, 19]
-    album_metadata = get_song_ids_by_album_id("191657132")
+    album_metadata = get_song_ids_by_album_id("87829831")
     index = 0
     for song_id in album_metadata['song_ids']:
         song_detail = album_metadata['song_details'][index]
@@ -600,9 +600,9 @@ def download_album():
 
 
 def download_song():
-    # https://music.163.com/song?id=473602689
+    # https://music.163.com/song?id=1403318151&uct2=U2FsdGVkX1/51s2ftrMtCWSRuIrLyQp53N06DKxa1F0=
     song_idx = None
-    metadata = get_song_metadata_by_song_id("1967736133", "lossless")
+    metadata = get_song_metadata_by_song_id("1403318151", "lossless")
     # song_idx = 91
     download_song_and_resources(metadata, idx=song_idx)
 
