@@ -128,6 +128,102 @@ def random_sleep():
     logger.info(f"Sleeping for {delay:.2f} seconds...")
     time.sleep(delay)
 
+def get_song_ids_by_playlist_id(playlist_id: str) -> Dict[str, Any]:
+    """
+    通过歌单ID提取歌单中所有歌曲的ID列表
+
+    Args:
+        playlist_id: 歌单ID(例如: "70512345")
+
+    Returns:
+        包含歌单信息和歌曲ID列表的字典
+    """
+    api = NeteaseMusicToolAPI("https://musicapi.lxchen.cn")
+
+    logger.info("=" * 60)
+    logger.info("🎵 通过歌单ID提取歌曲列表")
+    logger.info("=" * 60)
+    logger.info(f"歌单ID: {playlist_id}")
+    logger.info("-" * 60)
+
+    # 调用歌单解析接口
+    playlist_result_str = api.parse_playlist(playlist_id)
+    
+    try:
+        playlist_result = json.loads(playlist_result_str)
+        
+        if playlist_result.get('status') != 200:
+            logger.error(f"\n❌ 歌单解析失败: {playlist_result.get('message', '未知错误')}")
+            return {
+                "success": False, 
+                "message": playlist_result.get('message', '歌单解析失败'), 
+                "playlist_id": playlist_id
+            }
+        
+        # 提取歌单数据
+        playlist_data = playlist_result.get('data', {})
+        if not playlist_data:
+            logger.error(f"\n❌ 未找到歌单数据")
+            return {"success": False, "message": "未找到歌单数据", "playlist_id": playlist_id}
+        
+        playlist_name = playlist_data.get('name', '未知歌单')
+        playlist_creator = playlist_data.get('creator', {}).get('nickname', '未知创建者')
+        song_list = playlist_data.get('tracks', [])
+        
+        logger.info(f"\n✅ 歌单解析成功!")
+        logger.info(f"📋 歌单名称: {playlist_name}")
+        logger.info(f"👤 创建者: {playlist_creator}")
+        logger.info(f"🎵 歌曲数量: {len(song_list)}")
+        logger.info("-" * 60)
+        
+        # 提取所有歌曲ID
+        song_ids = []
+        song_details = []
+        
+        for i, song in enumerate(song_list, 1):
+            song_id = song.get('id')
+            song_name = song.get('name', '未知歌曲')
+            # 处理歌手信息
+            artists_data = song.get('ar', [])
+            if artists_data:
+                song_artists = "/".join([artist.get('name', '') for artist in artists_data if artist.get('name')])
+            else:
+                song_artists = song.get('artists', '未知艺术家')
+            
+            if song_id:
+                song_ids.append(str(song_id))
+                song_details.append({
+                    "id": str(song_id),
+                    "name": song_name,
+                    "artists": song_artists,
+                    "index": i
+                })
+                logger.info(f"{i:2d}. [{song_id}] {song_name} - {song_artists}")
+            else:
+                logger.warning(f"{i:2d}. ⚠️  无效歌曲数据: {song}")
+        
+        result = {
+            "success": True,
+            "playlist_id": playlist_id,
+            "playlist_name": playlist_name,
+            "playlist_creator": playlist_creator,
+            "song_count": len(song_ids),
+            "song_ids": song_ids,
+            "song_details": song_details,
+            "raw_data": playlist_result
+        }
+        
+        logger.info(f"\n✅ 成功提取 {len(song_ids)} 首歌曲的ID")
+        return result
+        
+    except json.JSONDecodeError as e:
+        logger.error(f"\n❌ JSON解析失败: {str(e)}")
+        return {"success": False, "message": f"JSON解析失败: {str(e)}", "playlist_id": playlist_id}
+    except Exception as e:
+        logger.error(f"\n❌ 处理过程中发生错误: {str(e)}")
+        return {"success": False, "message": f"处理失败: {str(e)}", "playlist_id": playlist_id}
+
+
 def get_song_ids_by_album_id(album_id: str) -> Dict[str, Any]:
     """
     通过专辑ID提取专辑中所有歌曲的ID列表
@@ -430,6 +526,149 @@ def write_metadata_to_file(file_path: str, metadata: Dict[str, Any]) -> bool:
         return False
 
 
+def write_picture_to_file(file_path: str) -> bool:
+    """
+    将同目录下的图片文件写入音频文件
+
+    Args:
+        file_path: 音频文件路径
+
+    Returns:
+        bool: 写入是否成功
+    """
+    try:
+        # 获取文件所在目录和基础文件名（不包含扩展名）
+        file_dir = os.path.dirname(file_path)
+        file_base_name = os.path.splitext(os.path.basename(file_path))[0]
+
+        # 支持的图片格式
+        image_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.gif']
+        cover_path = None
+
+        # 查找同目录下同名的图片文件
+        for ext in image_extensions:
+            potential_cover = os.path.join(file_dir, file_base_name + ext)
+            if os.path.exists(potential_cover):
+                cover_path = potential_cover
+                logger.info(f"🖼️  找到封面图片: {os.path.basename(cover_path)}")
+                break
+
+        if not cover_path:
+            logger.warning(f"⚠️  未找到与歌曲同名的图片文件")
+            return False
+
+        # 获取文件扩展名
+        _, ext = os.path.splitext(file_path)
+        ext = ext.lower()
+
+        logger.info(f"🏷️  正在将图片写入 {os.path.basename(file_path)}...")
+
+        if ext in ['.mp3', '.mp2', '.mp1']:
+            # 处理 MP3 文件
+            try:
+                audio_file = ID3(file_path)
+
+                # 读取图片文件
+                with open(cover_path, 'rb') as img_file:
+                    img_data = img_file.read()
+
+                    # 判断图片MIME类型
+                    mime_type = 'image/jpeg'
+                    if cover_path.lower().endswith('.png'):
+                        mime_type = 'image/png'
+                    elif cover_path.lower().endswith('.bmp'):
+                        mime_type = 'image/bmp'
+                    elif cover_path.lower().endswith('.gif'):
+                        mime_type = 'image/gif'
+
+                    # 添加封面图片
+                    audio_file.add(APIC(
+                        encoding=3,
+                        mime=mime_type,
+                        type=3,  # Cover (front)
+                        desc='Cover',
+                        data=img_data
+                    ))
+
+                audio_file.save()
+                logger.info(f"✅ MP3封面图片写入成功!")
+                return True
+
+            except Exception as e:
+                logger.error(f"❌ MP3封面图片写入失败: {str(e)}")
+                return False
+
+        elif ext == '.flac':
+            # 处理 FLAC 文件
+            try:
+                audio_file = FLAC(file_path)
+
+                # 读取图片文件
+                with open(cover_path, 'rb') as img_file:
+                    img_data = img_file.read()
+
+                    # 创建Picture对象
+                    picture = Picture()
+                    picture.type = 3  # Cover (front)
+
+                    # 判断图片MIME类型
+                    if cover_path.lower().endswith('.png'):
+                        picture.mime = 'image/png'
+                    elif cover_path.lower().endswith('.bmp'):
+                        picture.mime = 'image/bmp'
+                    elif cover_path.lower().endswith('.gif'):
+                        picture.mime = 'image/gif'
+                    else:
+                        picture.mime = 'image/jpeg'
+
+                    picture.data = img_data
+                    audio_file.add_picture(picture)
+
+                audio_file.save()
+                logger.info(f"✅ FLAC封面图片写入成功!")
+                return True
+
+            except Exception as e:
+                logger.error(f"❌ FLAC封面图片写入失败: {str(e)}")
+                return False
+
+        elif ext in ['.m4a', '.mp4', '.aac']:
+            # 处理 MP4/AAC 文件
+            try:
+                audio_file = MP4(file_path)
+
+                # 读取图片文件
+                with open(cover_path, 'rb') as img_file:
+                    img_data = img_file.read()
+
+                    # 判断图片格式
+                    image_format = MP4Cover.FORMAT_JPEG
+                    if cover_path.lower().endswith('.png'):
+                        image_format = MP4Cover.FORMAT_PNG
+
+                    # 更新标签
+                    if audio_file.tags is None:
+                        audio_file.add_tags()
+
+                    audio_file.tags['covr'] = [MP4Cover(img_data, imageformat=image_format)]
+
+                audio_file.save()
+                logger.info(f"✅ MP4/AAC封面图片写入成功!")
+                return True
+
+            except Exception as e:
+                logger.error(f"❌ MP4/AAC封面图片写入失败: {str(e)}")
+                return False
+
+        else:
+            logger.warning(f"⚠️  不支持的文件格式: {ext}")
+            return False
+
+    except Exception as e:
+        logger.error(f"❌ 图片写入过程中发生错误: {str(e)}")
+        return False
+
+
 def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str = "downloads", idx: int = None) -> bool:
     """
     下载歌曲文件和相关资源(歌词、封面)
@@ -564,6 +803,10 @@ def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str
                 logger.warning(f"⚠️  封面下载失败: {str(e)}")
         else:
             logger.warning("⚠️  未找到封面")
+
+        logger.info("🎵 添加封面到歌曲文件...")
+        write_picture_to_file(music_file_path)
+        logger.info("✅ 封面已添加到歌曲文件")
         
         logger.info(f"\n🎉 下载完成! 文件保存在: {download_dir}")
         return True
@@ -576,10 +819,15 @@ def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str
         return False
 
 
-def download_album():
-    index_ids = []
-    # index_ids = [4, 6, 15, 18, 19]
-    album_metadata = get_song_ids_by_album_id("87829831")
+def download_song(song_id: str, level: str = "lossless"):
+    song_idx = None
+    metadata = get_song_metadata_by_song_id(song_id, level)
+    # song_idx = 91
+    download_song_and_resources(metadata, idx=song_idx)
+
+
+def download_album(album_id: str, index_ids: list, level: str = "lossless"):
+    album_metadata = get_song_ids_by_album_id(album_id)
     index = 0
     for song_id in album_metadata['song_ids']:
         song_detail = album_metadata['song_details'][index]
@@ -589,30 +837,50 @@ def download_album():
         if len(index_ids) > 0:
             if song_index in index_ids:
                 logger.info(f"{song_index} is in the {index_ids}, continue downloading...")
-                metadata = get_song_metadata_by_song_id(song_id, "lossless")
+                metadata = get_song_metadata_by_song_id(song_id, level)
                 download_song_and_resources(metadata, idx=song_index)
             else:
                 logger.info(f"{song_index} is not in the {index_ids}, skipping downloading...")
         else:
-            metadata = get_song_metadata_by_song_id(song_id, "lossless")
+            metadata = get_song_metadata_by_song_id(song_id, level)
             download_song_and_resources(metadata, idx=song_index)
         index += 1
 
 
-def download_song():
-    # https://music.163.com/song?id=1403318151&uct2=U2FsdGVkX1/51s2ftrMtCWSRuIrLyQp53N06DKxa1F0=
-    song_idx = None
-    metadata = get_song_metadata_by_song_id("1403318151", "lossless")
-    # song_idx = 91
-    download_song_and_resources(metadata, idx=song_idx)
+def download_playlist(playlist_id: str, index_ids: list, level: str = "lossless"):
+    album_metadata = get_song_ids_by_playlist_id(playlist_id)
+    index = 0
+    for song_id in album_metadata['song_ids']:
+        song_detail = album_metadata['song_details'][index]
+        song_index = song_detail['index']
+        logger.info(f"{index + 1}. {song_detail}")
+
+        if len(index_ids) > 0:
+            if song_index in index_ids:
+                logger.info(f"{song_index} is in the {index_ids}, continue downloading...")
+                metadata = get_song_metadata_by_song_id(song_id, level)
+                download_song_and_resources(metadata, idx=song_index)
+            else:
+                logger.info(f"{song_index} is not in the {index_ids}, skipping downloading...")
+        else:
+            metadata = get_song_metadata_by_song_id(song_id, level)
+            download_song_and_resources(metadata, idx=song_index)
+        index += 1
 
 
 if __name__ == "__main__":
 
-    # Part-1 Download Songs by Album ID
-    download_album()
+    # Part-1 Download Song by Song ID
+    # https://music.163.com/song?id=1403318151&uct2=U2FsdGVkX1/51s2ftrMtCWSRuIrLyQp53N06DKxa1F0=
+    # download_song("1403318151")
 
-    # Part-2 Download Song by Song ID
-    # download_song()
+    indexes = []
+    # indexes = [4, 6, 15, 18, 19]
+
+    # Part-2 Download Songs by Album ID
+    # download_album("87829831", indexes)
+
+    # Part-3 Download Playlist
+    download_playlist("331841455", indexes)
 
     pass
