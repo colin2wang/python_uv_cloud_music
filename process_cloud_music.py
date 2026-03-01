@@ -85,7 +85,7 @@ class NeteaseMusicToolAPI:
         """Parse song details"""
         song_id = self._extract_id(song_id_or_url, 'song')
 
-        random_sleep(5.0)
+        random_sleep(3.0)
         response = self.session.post(
             f"{self.base_url}/Song_V1",
             data={'url': song_id, 'level': level, 'type': 'json'}
@@ -98,7 +98,7 @@ class NeteaseMusicToolAPI:
         """Parse playlist details"""
         playlist_id = self._extract_id(playlist_id_or_url, 'playlist')
 
-        random_sleep(5.0)
+        random_sleep(3.0)
         response = self.session.get(
             f"{self.base_url}/Playlist",
             params={'id': playlist_id}
@@ -112,7 +112,7 @@ class NeteaseMusicToolAPI:
         """Parse album details"""
         album_id = self._extract_id(album_id_or_url, 'album')
 
-        random_sleep(5.0)
+        random_sleep(3.0)
         response = self.session.get(
             f"{self.base_url}/Album",
             params={'id': album_id}
@@ -126,9 +126,9 @@ class NeteaseMusicToolAPI:
 quality_levels = ["lossless", "exhigh", "standard"]
 
 
-def random_sleep(max_delay: float = 2.0):
+def random_sleep(max_delay: float = 2.5):
     """Random delay to avoid frequent requests"""
-    delay = random.uniform(0.5, max_delay)
+    delay = random.uniform(1.0, max_delay)
     logger.info(f"Sleeping for {delay:.2f} seconds...")
     time.sleep(delay)
 
@@ -286,6 +286,7 @@ def get_song_ids_by_album_id(album_id: str) -> Dict[str, Any]:
         logger.info(f"🎤 艺术家: {album_artist}")
         logger.info(f"🎵 歌曲数量: {len(song_list)}")
         logger.info("-" * 60)
+
 
         # 提取所有歌曲ID
         song_ids = []
@@ -878,6 +879,9 @@ def download_album(album_id: str, index_ids: list, level: str = "lossless"):
             download_song_and_resources(metadata, idx=song_index)
         index += 1
 
+    album_artist = album_metadata['album_artist']
+    album_name = album_metadata['album_name']
+    logger.info(f"完成下载专辑： {album_artist} - {album_name}")
 
 def download_playlist(playlist_id: str, index_ids: list, level: str = "lossless"):
     playlist_metadata = get_song_ids_by_playlist_id(playlist_id)
@@ -903,15 +907,15 @@ def download_playlist(playlist_id: str, index_ids: list, level: str = "lossless"
 if __name__ == "__main__":
     # Part-1 Download Song by Song ID
     # https://music.163.com/song?id=1403318151&uct2=U2FsdGVkX1/51s2ftrMtCWSRuIrLyQp53N06DKxa1F0=
-    download_song("2124385868")
+    # download_song("2124385868")
 
     indexes = []
     # indexes = [4, 6, 15, 18, 19]
 
     # Part-2 Download Songs by Album ID
-    # download_album("360266684", indexes)
+    download_album("163089853", indexes)
 
     # Part-3 Download Playlist
-    # download_playlist("2605912264", indexes)
+    # download_playlist("5453912201", indexes)
 
     pass
