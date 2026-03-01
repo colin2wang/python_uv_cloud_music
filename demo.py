@@ -102,6 +102,7 @@ class NeteaseMusicToolAPI:
             f"{self.base_url}/Playlist",
             params={'id': playlist_id}
         )
+        logger.info("-" * 60)
         return response.text
 
     # ==================== 4. 专辑解析 ====================
@@ -161,14 +162,28 @@ def get_song_ids_by_playlist_id(playlist_id: str) -> Dict[str, Any]:
             }
         
         # 提取歌单数据
-        playlist_data = playlist_result.get('data', {})
-        if not playlist_data:
-            logger.error(f"\n❌ 未找到歌单数据")
-            return {"success": False, "message": "未找到歌单数据", "playlist_id": playlist_id}
+        data_section = playlist_result.get('data', {})
+        if not data_section:
+            logger.error(f"\n 未找到数据部分")
+            return {"success": False, "message": "未找到数据部分", "playlist_id": playlist_id}
+                
+        playlist_info = data_section.get('playlist', {})
+        if not playlist_info:
+            logger.error(f"\n 未找到歌单信息")
+            return {"success": False, "message": "未找到歌单信息", "playlist_id": playlist_id}
+                
+        playlist_name = playlist_info.get('name', '未知歌单')
+        playlist_creator = playlist_info.get('creator', '未知创建者')
+        track_count = playlist_info.get('trackCount', 0)
+        song_list = playlist_info.get('tracks', [])
         
-        playlist_name = playlist_data.get('name', '未知歌单')
-        playlist_creator = playlist_data.get('creator', {}).get('nickname', '未知创建者')
-        song_list = playlist_data.get('tracks', [])
+        # 调试信息
+        print(f"DEBUG: 原始数据键: {list(data_section.keys())}")
+        print(f"DEBUG: playlist键: {list(playlist_info.keys())}")
+        print(f"DEBUG: 歌单名称字段值: {playlist_name}")
+        print(f"DEBUG: 创建者字段值: {playlist_creator}")
+        print(f"DEBUG: 歌曲列表长度: {len(song_list)}")
+        print(f"DEBUG: trackCount字段值: {track_count}")
         
         logger.info(f"\n✅ 歌单解析成功!")
         logger.info(f"📋 歌单名称: {playlist_name}")
@@ -184,11 +199,7 @@ def get_song_ids_by_playlist_id(playlist_id: str) -> Dict[str, Any]:
             song_id = song.get('id')
             song_name = song.get('name', '未知歌曲')
             # 处理歌手信息
-            artists_data = song.get('ar', [])
-            if artists_data:
-                song_artists = "/".join([artist.get('name', '') for artist in artists_data if artist.get('name')])
-            else:
-                song_artists = song.get('artists', '未知艺术家')
+            song_artists = song.get('artists', '未知艺术家')
             
             if song_id:
                 song_ids.append(str(song_id))
@@ -820,10 +831,8 @@ def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str
 
 
 def download_song(song_id: str, level: str = "lossless"):
-    song_idx = None
     metadata = get_song_metadata_by_song_id(song_id, level)
-    # song_idx = 91
-    download_song_and_resources(metadata, idx=song_idx)
+    download_song_and_resources(metadata, idx=None)
 
 
 def download_album(album_id: str, index_ids: list, level: str = "lossless"):
@@ -847,11 +856,12 @@ def download_album(album_id: str, index_ids: list, level: str = "lossless"):
         index += 1
 
 
+
 def download_playlist(playlist_id: str, index_ids: list, level: str = "lossless"):
-    album_metadata = get_song_ids_by_playlist_id(playlist_id)
+    playlist_metadata = get_song_ids_by_playlist_id(playlist_id)
     index = 0
-    for song_id in album_metadata['song_ids']:
-        song_detail = album_metadata['song_details'][index]
+    for song_id in playlist_metadata['song_ids']:
+        song_detail = playlist_metadata['song_details'][index]
         song_index = song_detail['index']
         logger.info(f"{index + 1}. {song_detail}")
 
@@ -859,12 +869,12 @@ def download_playlist(playlist_id: str, index_ids: list, level: str = "lossless"
             if song_index in index_ids:
                 logger.info(f"{song_index} is in the {index_ids}, continue downloading...")
                 metadata = get_song_metadata_by_song_id(song_id, level)
-                download_song_and_resources(metadata, idx=song_index)
+                download_song_and_resources(metadata, idx=None)
             else:
                 logger.info(f"{song_index} is not in the {index_ids}, skipping downloading...")
         else:
             metadata = get_song_metadata_by_song_id(song_id, level)
-            download_song_and_resources(metadata, idx=song_index)
+            download_song_and_resources(metadata, idx=None)
         index += 1
 
 
@@ -878,9 +888,9 @@ if __name__ == "__main__":
     # indexes = [4, 6, 15, 18, 19]
 
     # Part-2 Download Songs by Album ID
-    # download_album("87829831", indexes)
+    download_album("360266684", indexes)
 
     # Part-3 Download Playlist
-    download_playlist("331841455", indexes)
+    # download_playlist("331841455", indexes)
 
     pass
