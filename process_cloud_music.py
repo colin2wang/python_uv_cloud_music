@@ -13,19 +13,28 @@ from mutagen.mp4 import MP4, MP4Cover
 
 from logging_config import setup_logger
 
-# 创建日志记录器
+# Create logger
 logger = setup_logger(__name__)
 
 
 class NeteaseMusicToolAPI:
     """
     Netease Music API Client
+    
+    Provides methods to interact with Netease Cloud Music API,
+    including search, song parsing, playlist parsing, and album parsing.
     """
 
     def __init__(self, base_url: str = "https://musicapi.lxchen.cn"):
+        """
+        Initialize the Netease Music API client
+        
+        Args:
+            base_url: Base URL for the API endpoint (default: https://musicapi.lxchen.cn)
+        """
         self.base_url = base_url.rstrip('/')
         self.session = requests.Session()
-        # 设置浏览器模拟请求头（排除HTTP/2伪头部）
+        # Set browser-simulated request headers (excluding HTTP/2 pseudo-headers)
         self.session.headers.update({
             'accept': 'application/json, text/javascript, */*; q=0.01',
             'accept-encoding': 'gzip, deflate, br, zstd',
@@ -45,7 +54,16 @@ class NeteaseMusicToolAPI:
         })
 
     def _extract_id(self, text: str, pattern_type: str = 'song') -> str:
-        """Extract ID from URL or text"""
+        """
+        Extract ID from URL or text
+        
+        Args:
+            text: Input text which may contain a URL or ID
+            pattern_type: Type of pattern to match ('song', 'playlist', or 'album')
+            
+        Returns:
+            Extracted numeric ID or original text if no ID found
+        """
         text = str(text) if text is not None else ""
         if not text:
             return text
@@ -67,10 +85,19 @@ class NeteaseMusicToolAPI:
 
         return text
 
-    # ==================== 1. 搜索功能 ====================
+    # ==================== 1. Search Function ====================
 
     def search(self, keyword: str, limit: int = 10) -> str:
-        """Search songs"""
+        """
+        Search for songs by keyword
+        
+        Args:
+            keyword: Search term to find songs
+            limit: Maximum number of results to return (default: 10)
+            
+        Returns:
+            JSON response string containing search results
+        """
 
         random_sleep(5.0)
         response = self.session.post(
@@ -79,10 +106,19 @@ class NeteaseMusicToolAPI:
         )
         return response.text
 
-    # ==================== 2. 单曲解析 ====================
+    # ==================== 2. Single Song Parsing ====================
 
     def parse_song(self, song_id_or_url: str, level: str = "lossless") -> str:
-        """Parse song details"""
+        """
+        Parse song details from ID or URL
+        
+        Args:
+            song_id_or_url: Song ID or URL to parse
+            level: Audio quality level ('lossless', 'exhigh', 'standard', etc.)
+            
+        Returns:
+            JSON response string containing song details
+        """
         song_id = self._extract_id(song_id_or_url, 'song')
 
         random_sleep(3.0)
@@ -92,10 +128,18 @@ class NeteaseMusicToolAPI:
         )
         return response.text
 
-    # ==================== 3. 歌单解析 ====================
+    # ==================== 3. Playlist Parsing ====================
 
     def parse_playlist(self, playlist_id_or_url: str) -> str:
-        """Parse playlist details"""
+        """
+        Parse playlist details from ID or URL
+        
+        Args:
+            playlist_id_or_url: Playlist ID or URL to parse
+            
+        Returns:
+            JSON response string containing playlist details
+        """
         playlist_id = self._extract_id(playlist_id_or_url, 'playlist')
 
         random_sleep(3.0)
@@ -106,10 +150,18 @@ class NeteaseMusicToolAPI:
         logger.info("-" * 60)
         return response.text
 
-    # ==================== 4. 专辑解析 ====================
+    # ==================== 4. Album Parsing ====================
 
     def parse_album(self, album_id_or_url: str) -> str:
-        """Parse album details"""
+        """
+        Parse album details from ID or URL
+        
+        Args:
+            album_id_or_url: Album ID or URL to parse
+            
+        Returns:
+            JSON response string containing album details
+        """
         album_id = self._extract_id(album_id_or_url, 'album')
 
         random_sleep(3.0)
@@ -120,14 +172,19 @@ class NeteaseMusicToolAPI:
         return response.text
 
 
-# ==================== 使用示例 ====================
+# ==================== Usage Examples ====================
 
-# 定义音质等级列表
+# Define quality level list
 quality_levels = ["lossless", "exhigh", "standard"]
 
 
 def random_sleep(max_delay: float = 2.5):
-    """Random delay to avoid frequent requests"""
+    """
+    Add random delay to avoid frequent requests
+    
+    Args:
+        max_delay: Maximum delay in seconds (default: 2.5)
+    """
     delay = random.uniform(1.0, max_delay)
     logger.info(f"Sleeping for {delay:.2f} seconds...")
     time.sleep(delay)
@@ -135,76 +192,68 @@ def random_sleep(max_delay: float = 2.5):
 
 def get_song_ids_by_playlist_id(playlist_id: str) -> Dict[str, Any]:
     """
-    通过歌单ID提取歌单中所有歌曲的ID列表
+    Extract song IDs from playlist ID
 
     Args:
-        playlist_id: 歌单ID(例如: "70512345")
+        playlist_id: Playlist ID (e.g., "70512345")
 
     Returns:
-        包含歌单信息和歌曲ID列表的字典
+        Dictionary containing playlist information and song ID list
     """
     api = NeteaseMusicToolAPI("https://musicapi.lxchen.cn")
 
     logger.info("=" * 60)
-    logger.info("🎵 通过歌单ID提取歌曲列表")
+    logger.info("Extract Songs from Playlist ID")
     logger.info("=" * 60)
-    logger.info(f"歌单ID: {playlist_id}")
+    logger.info(f"Playlist ID: {playlist_id}")
     logger.info("-" * 60)
 
-    # 调用歌单解析接口
+    # Call playlist parsing interface
     playlist_result_str = api.parse_playlist(playlist_id)
 
     try:
         playlist_result = json.loads(playlist_result_str)
 
         if playlist_result.get('status') != 200:
-            logger.error(f"\n❌ 歌单解析失败: {playlist_result.get('message', '未知错误')}")
+            logger.error(f"\nPlaylist parsing failed: {playlist_result.get('message', 'Unknown error')}")
             return {
                 "success": False,
-                "message": playlist_result.get('message', '歌单解析失败'),
+                "message": playlist_result.get('message', 'Playlist parsing failed'),
                 "playlist_id": playlist_id
             }
 
-        # 提取歌单数据
+        # Extract playlist data section
         data_section = playlist_result.get('data', {})
         if not data_section:
-            logger.error(f"\n 未找到数据部分")
-            return {"success": False, "message": "未找到数据部分", "playlist_id": playlist_id}
+            logger.error(f"\nData section not found")
+            return {"success": False, "message": "Data section not found", "playlist_id": playlist_id}
 
         playlist_info = data_section.get('playlist', {})
         if not playlist_info:
-            logger.error(f"\n 未找到歌单信息")
-            return {"success": False, "message": "未找到歌单信息", "playlist_id": playlist_id}
+            logger.error(f"\nPlaylist info not found")
+            return {"success": False, "message": "Playlist info not found", "playlist_id": playlist_id}
 
-        playlist_name = playlist_info.get('name', '未知歌单')
-        playlist_creator = playlist_info.get('creator', '未知创建者')
+        playlist_name = playlist_info.get('name', 'Unknown Playlist')
+        playlist_creator = playlist_info.get('creator', 'Unknown Creator')
         track_count = playlist_info.get('trackCount', 0)
         song_list = playlist_info.get('tracks', [])
 
-        # 调试信息
-        print(f"DEBUG: 原始数据键: {list(data_section.keys())}")
-        print(f"DEBUG: playlist键: {list(playlist_info.keys())}")
-        print(f"DEBUG: 歌单名称字段值: {playlist_name}")
-        print(f"DEBUG: 创建者字段值: {playlist_creator}")
-        print(f"DEBUG: 歌曲列表长度: {len(song_list)}")
-        print(f"DEBUG: trackCount字段值: {track_count}")
-
-        logger.info(f"\n✅ 歌单解析成功!")
-        logger.info(f"📋 歌单名称: {playlist_name}")
-        logger.info(f"👤 创建者: {playlist_creator}")
-        logger.info(f"🎵 歌曲数量: {len(song_list)}")
+        logger.info(f"\nPlaylist parsed successfully!")
+        logger.info(f"Playlist Name: {playlist_name}")
+        logger.info(f"Creator: {playlist_creator}")
+        logger.info(f"Track Count: {len(song_list)}")
         logger.info("-" * 60)
 
-        # 提取所有歌曲ID
+        # Extract all song IDs
         song_ids = []
         song_details = []
-
+        
         for i, song in enumerate(song_list, 1):
             song_id = song.get('id')
-            song_name = song.get('name', '未知歌曲')
-            # 处理歌手信息
-            song_artists = song.get('artists', '未知艺术家')
-
+            song_name = song.get('name', 'Unknown Song')
+            # Handle artist information
+            song_artists = song.get('artists', 'Unknown Artist')
+        
             if song_id:
                 song_ids.append(str(song_id))
                 song_details.append({
@@ -215,7 +264,7 @@ def get_song_ids_by_playlist_id(playlist_id: str) -> Dict[str, Any]:
                 })
                 logger.info(f"{i:2d}. [{song_id}] {song_name} - {song_artists}")
             else:
-                logger.warning(f"{i:2d}. ⚠️  无效歌曲数据: {song}")
+                logger.warning(f"{i:2d}. Invalid song data: {song}")
 
         result = {
             "success": True,
@@ -228,74 +277,74 @@ def get_song_ids_by_playlist_id(playlist_id: str) -> Dict[str, Any]:
             "raw_data": playlist_result
         }
 
-        logger.info(f"\n✅ 成功提取 {len(song_ids)} 首歌曲的ID")
+        logger.info(f"\nSuccessfully extracted {len(song_ids)} song IDs")
         return result
 
     except json.JSONDecodeError as e:
-        logger.error(f"\n❌ JSON解析失败: {str(e)}")
-        return {"success": False, "message": f"JSON解析失败: {str(e)}", "playlist_id": playlist_id}
+        logger.error(f"\nJSON parsing failed: {str(e)}")
+        return {"success": False, "message": f"JSON parsing failed: {str(e)}", "playlist_id": playlist_id}
     except Exception as e:
-        logger.error(f"\n❌ 处理过程中发生错误: {str(e)}")
-        return {"success": False, "message": f"处理失败: {str(e)}", "playlist_id": playlist_id}
+        logger.error(f"\nError occurred during processing: {str(e)}")
+        return {"success": False, "message": f"Processing failed: {str(e)}", "playlist_id": playlist_id}
 
 
 def get_song_ids_by_album_id(album_id: str) -> Dict[str, Any]:
     """
-    通过专辑ID提取专辑中所有歌曲的ID列表
+    Extract song IDs from album ID
 
     Args:
-        album_id: 专辑ID(例如: "361790100")
+        album_id: Album ID (e.g., "361790100")
 
     Returns:
-        包含专辑信息和歌曲ID列表的字典
+        Dictionary containing album information and song ID list
     """
     api = NeteaseMusicToolAPI("https://musicapi.lxchen.cn")
 
     logger.info("=" * 60)
-    logger.info("🎵 通过专辑ID提取歌曲列表")
+    logger.info("Extract Songs from Album ID")
     logger.info("=" * 60)
-    logger.info(f"专辑ID: {album_id}")
+    logger.info(f"Album ID: {album_id}")
     logger.info("-" * 60)
 
-    # 调用专辑解析接口
+    # Call album parsing interface
     album_result_str = api.parse_album(album_id)
 
     try:
         album_result = json.loads(album_result_str)
 
         if album_result.get('status') != 200:
-            logger.error(f"\n❌ 专辑解析失败: {album_result.get('message', '未知错误')}")
+            logger.error(f"\nAlbum parsing failed: {album_result.get('message', 'Unknown error')}")
             return {
                 "success": False,
-                "message": album_result.get('message', '专辑解析失败'),
+                "message": album_result.get('message', 'Album parsing failed'),
                 "album_id": album_id
             }
 
-        # 提取专辑数据
+        # Extract album data
         album_data = album_result.get('data', {}).get('album', {})
         if not album_data:
-            logger.error(f"\n❌ 未找到专辑数据")
-            return {"success": False, "message": "未找到专辑数据", "album_id": album_id}
+            logger.error(f"\nAlbum data not found")
+            return {"success": False, "message": "Album data not found", "album_id": album_id}
 
-        album_name = album_data.get('name', '未知专辑')
-        album_artist = album_data.get('artist', '未知艺术家')
+        album_name = album_data.get('name', 'Unknown Album')
+        album_artist = album_data.get('artist', 'Unknown Artist')
         song_list = album_data.get('songs', [])
 
-        logger.info(f"\n✅ 专辑解析成功!")
-        logger.info(f"💿 专辑名称: {album_name}")
-        logger.info(f"🎤 艺术家: {album_artist}")
-        logger.info(f"🎵 歌曲数量: {len(song_list)}")
+        logger.info(f"\nAlbum parsed successfully!")
+        logger.info(f"Album Name: {album_name}")
+        logger.info(f"Artist: {album_artist}")
+        logger.info(f"Song Count: {len(song_list)}")
         logger.info("-" * 60)
 
 
-        # 提取所有歌曲ID
+        # Extract all song IDs
         song_ids = []
         song_details = []
 
         for i, song in enumerate(song_list, 1):
             song_id = song.get('id')
-            song_name = song.get('name', '未知歌曲')
-            song_artists = song.get('artists', '未知艺术家')
+            song_name = song.get('name', 'Unknown Song')
+            song_artists = song.get('artists', 'Unknown Artist')
 
             if song_id:
                 song_ids.append(str(song_id))
@@ -307,7 +356,7 @@ def get_song_ids_by_album_id(album_id: str) -> Dict[str, Any]:
                 })
                 logger.info(f"{i:2d}. [{song_id}] {song_name} - {song_artists}")
             else:
-                logger.warning(f"{i:2d}. ⚠️  无效歌曲数据: {song}")
+                logger.warning(f"{i:2d}. Invalid song data: {song}")
 
         result = {
             "success": True,
@@ -320,44 +369,44 @@ def get_song_ids_by_album_id(album_id: str) -> Dict[str, Any]:
             "raw_data": album_result
         }
 
-        logger.info(f"\n✅ 成功提取 {len(song_ids)} 首歌曲的ID")
+        logger.info(f"\nSuccessfully extracted {len(song_ids)} song IDs")
         return result
 
     except json.JSONDecodeError as e:
-        logger.error(f"\n❌ JSON解析失败: {str(e)}")
-        return {"success": False, "message": f"JSON解析失败: {str(e)}", "album_id": album_id}
+        logger.error(f"\nJSON parsing failed: {str(e)}")
+        return {"success": False, "message": f"JSON parsing failed: {str(e)}", "album_id": album_id}
     except Exception as e:
-        logger.error(f"\n❌ 处理过程中发生错误: {str(e)}")
-        return {"success": False, "message": f"处理失败: {str(e)}", "album_id": album_id}
+        logger.error(f"\nError occurred during processing: {str(e)}")
+        return {"success": False, "message": f"Processing failed: {str(e)}", "album_id": album_id}
 
 
 def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> Dict[str, Any]:
     """
-    通过歌曲ID提取歌曲信息
+    Extract song information by song ID
 
     Args:
-        song_id: 歌曲ID(例如: "186016")
-        level: 音质等级 (standard, exhigh, lossless, hires)
+        song_id: Song ID (e.g., "186016")
+        level: Quality level (standard, exhigh, lossless, hires)
 
     Returns:
-        包含歌曲详细信息的字典，包含下载链接
+        Dictionary containing detailed song information with download links
     """
     try:
         api = NeteaseMusicToolAPI("https://musicapi.lxchen.cn")
 
         logger.info("=" * 60)
-        logger.info("🎵 通过歌曲ID提取信息")
+        logger.info("Extract Song Metadata by Song ID")
         logger.info("=" * 60)
-        logger.info(f"歌曲ID: {song_id}")
-        logger.info(f"音质等级: {level}")
+        logger.info(f"Song ID: {song_id}")
+        logger.info(f"Quality Level: {level}")
         logger.info("-" * 60)
 
         result = None
         used_level = None
 
-        # 尝试不同音质等级
+        # Try different quality levels
         for qual in quality_levels:
-            logger.info(f"🔄 尝试音质: {qual}")
+            logger.info(f"Attempting quality: {qual}")
             try:
                 result_str = api.parse_song(song_id, level=qual)
 
@@ -366,65 +415,65 @@ def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> Dict[
                     if temp_result.get('status') == 200 and temp_result.get('data', {}).get('url'):
                         result = temp_result
                         used_level = qual
-                        logger.info(f"✅ 找到可用音质: {qual}")
+                        logger.info(f"Found available quality: {qual}")
                         break
                     else:
-                        logger.warning(f"⚠️  音质 {qual} 不可用: {temp_result.get('data', {}).get('msg', '未知原因')}")
+                        logger.warning(f"Quality {qual} not available: {temp_result.get('data', {}).get('msg', 'Unknown reason')}")
                 except json.JSONDecodeError:
-                    logger.error(f"❌ 音质 {qual} 解析失败")
+                    logger.error(f"Quality {qual} parsing failed")
                     continue
             except requests.exceptions.RequestException as e:
-                logger.error(f"❌ 网络请求失败 (音质 {qual}): {str(e)}")
+                logger.error(f"Network request failed (Quality {qual}): {str(e)}")
                 continue
             except Exception as e:
-                logger.error(f"❌ 获取音质 {qual} 时发生未知错误: {str(e)}")
+                logger.error(f"Unknown error occurred while getting quality {qual}: {str(e)}")
                 continue
 
         if not result:
-            logger.error(f"\n❌ 所有音质均不可用")
-            return {"success": False, "message": "无可用音质", "tried_levels": quality_levels}
+            logger.error(f"\nAll qualities are unavailable")
+            return {"success": False, "message": "No available quality", "tried_levels": quality_levels}
 
         if result and result.get('status') == 200:
             data = result['data']
-            logger.info(f"\n✅ 提取成功!\n")
-            logger.info(f"🎶 歌曲名称: {data['name']}")
-            logger.info(f"🎤 歌手: {data['ar_name']}")
-            logger.info(f"💿 专辑: {data['al_name']}")
-            logger.info(f"🔊 实际音质: {used_level or data['level']}")
-            logger.info(f"📦 文件大小: {data['size']}")
-            logger.info(f"🔗 下载/播放链接: {data['url']}")
-            logger.info(f"🖼️  封面图片: {data['pic']}")
+            logger.info(f"\nExtraction successful!\n")
+            logger.info(f"Song Name: {data['name']}")
+            logger.info(f"Artist: {data['ar_name']}")
+            logger.info(f"Album: {data['al_name']}")
+            logger.info(f"Actual quality: {used_level or data['level']}")
+            logger.info(f"File Size: {data['size']}")
+            logger.info(f"Download/Play URL: {data['url']}")
+            logger.info(f"Cover Image: {data['pic']}")
 
-            # 返回实际使用的音质
+            # Return actually used quality
             result['used_quality'] = used_level or data['level']
 
             if data.get('lyric'):
-                logger.info(f"\n📝 歌词:")
+                logger.info(f"\nLyrics:")
                 logger.info(data['lyric'][:500] + "..." if len(data['lyric']) > 500 else data['lyric'])
 
             return result
         else:
-            logger.error(f"\n❌ 提取失败: {result.get('data', {}).get('msg', '未知错误')}")
+            logger.error(f"\nExtraction failed: {result.get('data', {}).get('msg', 'Unknown error')}")
             return result
 
     except Exception as e:
-        logger.error(f"❌ 获取歌曲元数据时发生严重错误: {str(e)}")
-        return {"success": False, "message": f"获取元数据失败: {str(e)}", "song_id": song_id}
+        logger.error(f"Critical error occurred while getting song metadata: {str(e)}")
+        return {"success": False, "message": f"Failed to get metadata: {str(e)}", "song_id": song_id}
 
 
 def write_metadata_to_file(file_path: str, metadata: Dict[str, Any]) -> bool:
     """
-    将元数据写入音频文件
+    Write metadata to audio file
 
     Args:
-        file_path: 音频文件路径
-        metadata: 包含歌曲信息的元数据字典
+        file_path: Audio file path
+        metadata: Dictionary containing song information metadata
 
     Returns:
-        bool: 写入是否成功
+        bool: Whether writing was successful
     """
     try:
-        # 获取文件扩展名
+        # Get file extension
         _, ext = os.path.splitext(file_path)
         ext = ext.lower()
 
@@ -435,37 +484,37 @@ def write_metadata_to_file(file_path: str, metadata: Dict[str, Any]) -> bool:
         cover_path = metadata.get('cover_path', '')
         track_number = metadata.get('track_number', '')
 
-        logger.info(f"🏷️  正在写入元数据到 {os.path.basename(file_path)}...")
+        logger.info(f"Writing metadata to {os.path.basename(file_path)}...")
 
         if ext in ['.mp3', '.mp2', '.mp1']:
-            # 处理 MP3 文件
+            # Process MP3 files
             audio_file = ID3(file_path)
 
-            # 标题
+            # Title
             if song_name:
                 audio_file.add(TIT2(encoding=3, text=song_name))
 
-            # 艺术家
+            # Artist
             if artist:
                 audio_file.add(TPE1(encoding=3, text=artist))
 
-            # 专辑
+            # Album
             if album:
                 audio_file.add(TALB(encoding=3, text=album))
 
-            # 年份
+            # Year
             audio_file.add(TYER(encoding=3, text=str(time.localtime().tm_year)))
 
-            # 轨道号
+            # Track number
             if track_number:
                 from mutagen.id3 import TRCK
                 audio_file.add(TRCK(encoding=3, text=track_number))
 
-            # 注释（歌词）
+            # Comments (lyrics)
             if lyric:
-                audio_file.add(COMM(encoding=3, lang='eng', desc='', text=lyric[:1000]))  # 限制长度
+                audio_file.add(COMM(encoding=3, lang='eng', desc='', text=lyric[:1000]))  # Limit length
 
-            # 封面图片
+            # Cover image
             if cover_path and os.path.exists(cover_path):
                 try:
                     with open(cover_path, 'rb') as img_file:
@@ -478,12 +527,12 @@ def write_metadata_to_file(file_path: str, metadata: Dict[str, Any]) -> bool:
                             data=img_data
                         ))
                 except Exception as e:
-                    logger.warning(f"⚠️  封面图片写入失败: {str(e)}")
+                    logger.warning(f"Cover image writing failed: {str(e)}")
 
             audio_file.save()
 
         elif ext == '.flac':
-            # 处理 FLAC 文件
+            # Process FLAC files
             audio_file = FLAC(file_path)
 
             if song_name:
@@ -497,7 +546,7 @@ def write_metadata_to_file(file_path: str, metadata: Dict[str, Any]) -> bool:
             if track_number:
                 audio_file['TRACKNUMBER'] = track_number
 
-            # 添加封面
+            # Add cover
             if cover_path and os.path.exists(cover_path):
                 try:
                     with open(cover_path, 'rb') as img_file:
@@ -508,15 +557,15 @@ def write_metadata_to_file(file_path: str, metadata: Dict[str, Any]) -> bool:
                         picture.data = img_data
                         audio_file.add_picture(picture)
                 except Exception as e:
-                    logger.warning(f"⚠️  封面图片写入失败: {str(e)}")
+                    logger.warning(f"Cover image writing failed: {str(e)}")
 
             audio_file.save()
 
         elif ext in ['.m4a', '.mp4', '.aac']:
-            # 处理 MP4/AAC 文件
+            # Process MP4/AAC files
             audio_file = MP4(file_path)
 
-            # 创建元数据字典
+            # Create metadata dictionary
             mp4_tags = {}
 
             if song_name:
@@ -530,77 +579,77 @@ def write_metadata_to_file(file_path: str, metadata: Dict[str, Any]) -> bool:
             if track_number:
                 mp4_tags['trkn'] = [(int(track_number), 0)]  # Track number for MP4
 
-            # 添加封面
+            # Add cover
             if cover_path and os.path.exists(cover_path):
                 try:
                     with open(cover_path, 'rb') as img_file:
                         img_data = img_file.read()
                         mp4_tags['covr'] = [MP4Cover(img_data, imageformat=MP4Cover.FORMAT_JPEG)]
                 except Exception as e:
-                    logger.warning(f"⚠️  封面图片写入失败: {str(e)}")
+                    logger.warning(f"Cover image writing failed: {str(e)}")
 
             audio_file.tags.update(mp4_tags)
             audio_file.save()
 
         else:
-            logger.warning(f"⚠️  不支持的文件格式: {ext}")
+            logger.warning(f"Unsupported file format: {ext}")
             return False
 
-        logger.info(f"✅ 元数据写入成功!")
+        logger.info(f"Metadata written successfully!")
         return True
 
     except Exception as e:
-        logger.error(f"❌ 元数据写入失败: {str(e)}")
+        logger.error(f"Metadata writing failed: {str(e)}")
         return False
 
 
 def write_picture_to_file(file_path: str) -> bool:
     """
-    将同目录下的图片文件写入音频文件
+    Write image file in the same directory to audio file
 
     Args:
-        file_path: 音频文件路径
+        file_path: Audio file path
 
     Returns:
-        bool: 写入是否成功
+        bool: Whether writing was successful
     """
     try:
-        # 获取文件所在目录和基础文件名（不包含扩展名）
+        # Get directory and base filename (without extension) of the file
         file_dir = os.path.dirname(file_path)
         file_base_name = os.path.splitext(os.path.basename(file_path))[0]
 
-        # 支持的图片格式
+        # Supported image formats
         image_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.gif']
         cover_path = None
 
-        # 查找同目录下同名的图片文件
+        # Look for image files with the same name in the same directory
         for ext in image_extensions:
             potential_cover = os.path.join(file_dir, file_base_name + ext)
             if os.path.exists(potential_cover):
                 cover_path = potential_cover
-                logger.info(f"🖼️  找到封面图片: {os.path.basename(cover_path)}")
+                logger.info(f"Found cover image: {os.path.basename(cover_path)}")
                 break
 
         if not cover_path:
-            logger.warning(f"⚠️  未找到与歌曲同名的图片文件")
+            logger.warning(f"No image file found with the same name")
             return False
 
-        # 获取文件扩展名
+        # Get file extension
         _, ext = os.path.splitext(file_path)
         ext = ext.lower()
 
-        logger.info(f"🏷️  正在将图片写入 {os.path.basename(file_path)}...")
+        logger.info(f"Writing image to {os.path.basename(file_path)}...")
 
         if ext in ['.mp3', '.mp2', '.mp1']:
-            # 处理 MP3 文件
+            # Process MP3 files
             try:
                 audio_file = ID3(file_path)
 
-                # 读取图片文件
+                # Read image file
                 with open(cover_path, 'rb') as img_file:
                     img_data = img_file.read()
 
-                    # 判断图片MIME类型
+                    # Determine image MIME type
                     mime_type = 'image/jpeg'
                     if cover_path.lower().endswith('.png'):
                         mime_type = 'image/png'
@@ -609,7 +658,7 @@ def write_picture_to_file(file_path: str) -> bool:
                     elif cover_path.lower().endswith('.gif'):
                         mime_type = 'image/gif'
 
-                    # 添加封面图片
+                    # Add cover image
                     audio_file.add(APIC(
                         encoding=3,
                         mime=mime_type,
@@ -619,27 +668,27 @@ def write_picture_to_file(file_path: str) -> bool:
                     ))
 
                 audio_file.save()
-                logger.info(f"✅ MP3封面图片写入成功!")
+                logger.info(f"MP3 cover image written successfully!")
                 return True
 
             except Exception as e:
-                logger.error(f"❌ MP3封面图片写入失败: {str(e)}")
+                logger.error(f"MP3 cover image writing failed: {str(e)}")
                 return False
 
         elif ext == '.flac':
-            # 处理 FLAC 文件
+            # Process FLAC files
             try:
                 audio_file = FLAC(file_path)
 
-                # 读取图片文件
+                # Read image file
                 with open(cover_path, 'rb') as img_file:
                     img_data = img_file.read()
 
-                    # 创建Picture对象
+                    # Create Picture object
                     picture = Picture()
                     picture.type = 3  # Cover (front)
 
-                    # 判断图片MIME类型
+                    # Determine image MIME type
                     if cover_path.lower().endswith('.png'):
                         picture.mime = 'image/png'
                     elif cover_path.lower().endswith('.bmp'):
@@ -653,64 +702,64 @@ def write_picture_to_file(file_path: str) -> bool:
                     audio_file.add_picture(picture)
 
                 audio_file.save()
-                logger.info(f"✅ FLAC封面图片写入成功!")
+                logger.info(f"FLAC cover image written successfully!")
                 return True
 
             except Exception as e:
-                logger.error(f"❌ FLAC封面图片写入失败: {str(e)}")
+                logger.error(f"FLAC cover image writing failed: {str(e)}")
                 return False
 
         elif ext in ['.m4a', '.mp4', '.aac']:
-            # 处理 MP4/AAC 文件
+            # Process MP4/AAC files
             try:
                 audio_file = MP4(file_path)
 
-                # 读取图片文件
+                # Read image file
                 with open(cover_path, 'rb') as img_file:
                     img_data = img_file.read()
 
-                    # 判断图片格式
+                    # Determine image format
                     image_format = MP4Cover.FORMAT_JPEG
                     if cover_path.lower().endswith('.png'):
                         image_format = MP4Cover.FORMAT_PNG
 
-                    # 更新标签
+                    # Update tags
                     if audio_file.tags is None:
                         audio_file.add_tags()
 
                     audio_file.tags['covr'] = [MP4Cover(img_data, imageformat=image_format)]
 
                 audio_file.save()
-                logger.info(f"✅ MP4/AAC封面图片写入成功!")
+                logger.info(f"MP4/AAC cover image written successfully!")
                 return True
 
             except Exception as e:
-                logger.error(f"❌ MP4/AAC封面图片写入失败: {str(e)}")
+                logger.error(f"MP4/AAC cover image writing failed: {str(e)}")
                 return False
 
         else:
-            logger.warning(f"⚠️  不支持的文件格式: {ext}")
+            logger.warning(f"Unsupported file format: {ext}")
             return False
 
     except Exception as e:
-        logger.error(f"❌ 图片写入过程中发生错误: {str(e)}")
+        logger.error(f"Error occurred while writing image: {str(e)}")
         return False
 
 
 def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str = "downloads",
                                 idx: int = None) -> bool:
     """
-    下载歌曲文件和相关资源(歌词、封面)
+    Download song file and related resources (lyrics, cover)
 
     Args:
-        song_metadata: 歌曲元数据字典
-        download_dir: 下载目录路径
+        song_metadata: Song metadata dictionary
+        download_dir: Download directory path
 
     Returns:
-        bool: 下载是否成功
+        bool: Whether download was successful
     """
     if not song_metadata or not song_metadata.get('success', True):
-        logger.error("❌ 无效的歌曲元数据")
+        logger.error("Invalid song metadata")
         return False
 
     try:
@@ -724,25 +773,25 @@ def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str
         file_size = data.get('size', '')
         quality = song_metadata.get('used_quality', data.get('level', 'unknown'))
 
-        # 创建下载目录
+        # Create download directory
         os.makedirs(download_dir, exist_ok=True)
 
-        # 清理文件名中的非法字符
+        # Clean illegal characters from filename
         safe_song_name = re.sub(r'[<>:"/\\|?*]', '_', song_name)
         safe_artist = re.sub(r'[<>:"/\\|?*]', '_', artist)
 
-        # 从下载URL中提取文件扩展名
-        file_extension = ".mp3"  # 默认扩展名
+        # Extract file extension from download URL
+        file_extension = ".mp3"  # Default extension
         if download_url:
-            # 解析URL获取文件名
+            # Parse URL to get filename
             parsed_url = urllib.parse.urlparse(download_url)
-            # 从路径中提取文件扩展名
+            # Extract file extension from path
             path_parts = parsed_url.path.split('/')
             if path_parts:
                 last_part = path_parts[-1]
                 if '.' in last_part:
                     file_extension = os.path.splitext(last_part)[1].lower()
-            # 如果URL参数中有文件信息，也尝试提取
+            # If URL parameters contain file information, also try to extract
             if not file_extension or file_extension == ".mp3":
                 query_params = urllib.parse.parse_qs(parsed_url.query)
                 if 'v' in query_params and query_params['v'][0]:
@@ -752,9 +801,9 @@ def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str
                         if ext_from_v in ['.flac', '.wav', '.aac', '.m4a']:
                             file_extension = ext_from_v
 
-        # 构造文件名
+        # Construct filename
         if idx is not None:
-            # 如果提供了索引，格式化为3位数字（不足前面补0）
+            # If index is provided, format as 3-digit number (pad with 0 if necessary)
             formatted_index = f"{idx:03d}"
             filename = f"{formatted_index} - {safe_artist} - {safe_song_name}"
         else:
@@ -763,21 +812,21 @@ def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str
         lyric_file_path = os.path.join(download_dir, f"{filename}.lrc")
         cover_file_path = os.path.join(download_dir, f"{filename}.jpg")
 
-        logger.info(f"📄 检测到文件格式: {file_extension}")
+        logger.info(f"Detected file format: {file_extension}")
 
-        # 检查同名文件是否已存在，如果存在则跳过下载
+        # Check if a file with the same name already exists, if so skip download
         if os.path.exists(music_file_path):
-            logger.info(f"\n⏭️  文件已存在，跳过下载: {os.path.basename(music_file_path)}")
-            logger.info(f"📁 文件路径: {music_file_path}")
+            logger.info(f"File already exists, skipping download: {os.path.basename(music_file_path)}")
+            logger.info(f"File path: {music_file_path}")
             return True
 
-        logger.info(f"\n📥 开始下载: {filename}")
-        logger.info(f"📊 文件大小: {file_size}")
-        logger.info(f"🔊 音质: {quality}")
+        logger.info(f"Starting download: {filename}")
+        logger.info(f"File size: {file_size}")
+        logger.info(f"Quality: {quality}")
         logger.info("-" * 60)
 
-        # 下载音乐文件
-        logger.info("🎵 正在下载音乐文件...")
+        # Download music file
+        logger.info("Downloading music file...")
         random_sleep()
         try:
             response = requests.get(download_url, stream=True, timeout=30)
@@ -788,44 +837,44 @@ def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str
                     if chunk:
                         f.write(chunk)
 
-            logger.info(f"✅ 音乐文件下载完成: {os.path.basename(music_file_path)}")
+                logger.info(f"Music file downloaded: {os.path.basename(music_file_path)}")
         except Exception as e:
-            logger.error(f"❌ 音乐文件下载失败: {str(e)}")
+            logger.error(f"Music file download failed: {str(e)}")
             return False
 
-        # 将封面路径和轨道号传递给元数据
+        # Pass cover path and track number to metadata
         metadata_for_tagging = data.copy()
         if os.path.exists(cover_file_path):
             metadata_for_tagging['cover_path'] = cover_file_path
         else:
             metadata_for_tagging['cover_path'] = ''
 
-        # 添加轨道号信息
+        # Add track number information
         if idx is not None:
             metadata_for_tagging['track_number'] = str(idx)
 
-        # 写入元数据到音频文件
-        logger.info("\n🏷️  正在写入元数据...")
+        # Write metadata to audio file
+        logger.info("\nWriting metadata...")
         if write_metadata_to_file(music_file_path, metadata_for_tagging):
-            logger.info(f"✅ 元数据已成功附加到: {os.path.basename(music_file_path)}")
+            logger.info(f"Metadata successfully attached to: {os.path.basename(music_file_path)}")
         else:
-            logger.warning(f"⚠️  元数据写入失败，但文件已正常下载")
+            logger.warning(f"Metadata writing failed, but file has been downloaded normally")
 
-        # 下载歌词
+        # Download lyrics
         if lyric:
-            logger.info("📝 正在保存歌词...")
+            logger.info("Saving lyrics...")
             try:
                 with open(lyric_file_path, 'w', encoding='utf-8') as f:
                     f.write(lyric)
-                logger.info(f"✅ 歌词保存完成: {os.path.basename(lyric_file_path)}")
+                logger.info(f"Lyrics saved: {os.path.basename(lyric_file_path)}")
             except Exception as e:
-                logger.warning(f"⚠️  歌词保存失败: {str(e)}")
+                logger.warning(f"Lyrics saving failed: {str(e)}")
         else:
-            logger.warning("⚠️  未找到歌词")
+            logger.warning("No lyrics found")
 
-        # 下载封面
+        # Download cover
         if cover_url:
-            logger.info("🖼️  正在下载封面...")
+            logger.info("Downloading cover...")
             random_sleep()
             try:
                 cover_response = requests.get(cover_url + '?param=320x320', timeout=10)
@@ -833,24 +882,24 @@ def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str
 
                 with open(cover_file_path, 'wb') as f:
                     f.write(cover_response.content)
-                logger.info(f"✅ 封面下载完成: {os.path.basename(cover_file_path)}")
+                logger.info(f"Cover downloaded: {os.path.basename(cover_file_path)}")
             except Exception as e:
-                logger.warning(f"⚠️  封面下载失败: {str(e)}")
+                logger.warning(f"Cover download failed: {str(e)}")
         else:
-            logger.warning("⚠️  未找到封面")
+            logger.warning("No cover found")
 
-        logger.info("🎵 添加封面到歌曲文件...")
+        logger.info("Adding cover to song file...")
         write_picture_to_file(music_file_path)
-        logger.info("✅ 封面已添加到歌曲文件")
+        logger.info("Cover has been added to the song file")
 
-        logger.info(f"\n🎉 下载完成! 文件保存在: {download_dir}")
+        logger.info(f"\n🎉 Download completed! Files saved in: {download_dir}")
         return True
 
     except KeyError as e:
-        logger.error(f"❌ 元数据缺少必要字段: {str(e)}")
+        logger.error(f"Metadata missing required field: {str(e)}")
         return False
     except Exception as e:
-        logger.error(f"❌ 下载过程中发生错误: {str(e)}")
+        logger.error(f"Error occurred during download: {str(e)}")
         return False
 
 
@@ -881,7 +930,7 @@ def download_album(album_id: str, index_ids: list, level: str = "lossless"):
 
     album_artist = album_metadata['album_artist']
     album_name = album_metadata['album_name']
-    logger.info(f"完成下载专辑： {album_artist} - {album_name}")
+    logger.info(f"Completed downloading album: {album_artist} - {album_name}")
 
 def download_playlist(playlist_id: str, index_ids: list, level: str = "lossless"):
     playlist_metadata = get_song_ids_by_playlist_id(playlist_id)
@@ -906,14 +955,14 @@ def download_playlist(playlist_id: str, index_ids: list, level: str = "lossless"
 
 if __name__ == "__main__":
     # Part-1 Download Song by Song ID
-    # https://music.163.com/song?id=1403318151&uct2=U2FsdGVkX1/51s2ftrMtCWSRuIrLyQp53N06DKxa1F0=
-    # download_song("2124385868")
+    # https://music.163.com/song?id=2742958669
+    # download_song("2742958669")
 
     indexes = []
     # indexes = [4, 6, 15, 18, 19]
 
     # Part-2 Download Songs by Album ID
-    download_album("163089853", indexes)
+    download_album("21774", indexes)
 
     # Part-3 Download Playlist
     # download_playlist("5453912201", indexes)
