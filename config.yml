@@ -1,0 +1,78 @@
+# 网易云音乐下载器配置文件
+# Configuration file for Netease Cloud Music Downloader
+
+# API 配置
+api:
+  base_url: "https://musicapi.lxchen.cn"
+
+# 下载配置
+download:
+  # 默认下载目录
+  default_dir: "downloads"
+  
+  # 默认音质等级 (standard, exhigh, lossless, hires, sky, jyeffect, jymaster)
+  #  standard - 标准音质
+  #  exhigh - 极高音质
+  #  lossless - 无损音质（当前默认值）
+  #  hires - Hires 音质
+  #  sky - 沉浸环绕声
+  #  jyeffect - 高清环绕声
+  #  jymaster - 超清母带
+  default_quality: "lossless"
+  
+  # 是否在文件名中添加序号
+  add_index_to_filename: true
+  
+  # 序号格式 (3 位数字：001, 002, ...)
+  index_format: "03d"
+
+# 文件命名配置
+filename:
+  # 文件名格式：{index} - {artist} - {title}
+  # 可用变量：index, artist, title, album
+  pattern: "{index} - {artist} - {title}"
+  
+  # 非法字符替换为
+  illegal_char_replacement: "_"
+
+# 元数据写入配置
+metadata:
+  # 是否写入元数据
+  write_metadata: true
+  
+  # 是否写入封面图片
+  write_cover: true
+  
+  # 是否写入歌词
+  write_lyrics: true
+  
+  # 歌词最大长度
+  max_lyric_length: 1000
+
+# 网络请求配置
+network:
+  # 请求超时时间（秒）
+  timeout: 30
+  
+  # 随机延迟最大值（秒）
+  random_delay_max: 2.5
+  
+  # API 请求间隔最小值（秒）
+  api_delay_min: 1.0
+
+# 日志配置
+logging:
+  # 日志级别 (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+  level: "INFO"
+  
+  # 日志文件格式
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  
+  # 是否输出到控制台
+  console_output: true
+  
+  # 是否输出到文件
+  file_output: true
+  
+  # 日志文件路径
+  log_file: "logs/app.log"

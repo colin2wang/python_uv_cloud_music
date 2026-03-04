@@ -26,7 +26,7 @@ A powerful Python-based tool for organizing, downloading, and managing your digi
 
 Using pip:
 ```bash
-pip install requests mutagen
+pip install requests mutagen pyyaml
 ```
 
 Or using uv (recommended):
@@ -70,6 +70,29 @@ download_playlist("11223344", index_ids=[1, 3, 5], level="lossless")
 ```
 
 ## Configuration
+
+### Using the Configuration File
+
+The tool now supports YAML-based configuration through `config.yml`. This allows you to customize behavior without modifying code.
+
+**Key Configuration Options:**
+
+```yaml
+# download: Default download settings
+default_dir: "downloads"          # Download directory
+default_quality: "lossless"        # Audio quality (lossless/exhigh/standard)
+add_index_to_filename: true        # Add track numbers to filenames
+index_format: "03d"                # Number format (e.g., 001, 002)
+
+# metadata: Control what gets embedded
+write_metadata: true               # Write song metadata
+write_cover: true                  # Embed cover art
+write_lyrics: true                 # Save and embed lyrics
+
+# network: Connection settings
+timeout: 30                        # Request timeout in seconds
+random_delay_max: 2.5              # Max random delay between requests
+```
 
 ### Quality Levels
 
@@ -141,8 +164,14 @@ Download song and all related resources (lyrics, cover art) with metadata embedd
 
 ### Custom API Endpoint
 
-You can configure a custom API endpoint by modifying the `NeteaseMusicToolAPI` initialization:
+You can configure a custom API endpoint in `config.yml`:
 
+```yaml
+api:
+  base_url: "https://your-custom-api.com"
+```
+
+Or programmatically:
 ```python
 api = NeteaseMusicToolAPI(base_url="https://your-custom-api.com")
 ```
@@ -177,8 +206,11 @@ Special characters are automatically replaced with underscores to ensure cross-p
 ```
 .
 ├── process_cloud_music.py    # Main processing logic
+├── config_manager.py         # Configuration management
+├── config.yml                # YAML configuration file
 ├── logging_config.py         # Logging configuration
 ├── pyproject.toml            # Project dependencies
+├── test_config.py            # Configuration test script
 ├── api_docs/                 # API documentation
 │   ├── get_song.md
 │   ├── get_album.md
