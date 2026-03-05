@@ -331,11 +331,15 @@ def get_song_ids_by_album_id(album_id: str) -> Dict[str, Any]:
 
         album_name = album_data.get('name', 'Unknown Album')
         album_artist = album_data.get('artist', 'Unknown Artist')
+        album_publish_time = album_data.get('publishTime')
         song_list = album_data.get('songs', [])
 
         logger.info(f"\nAlbum parsed successfully!")
         logger.info(f"Album Name: {album_name}")
         logger.info(f"Artist: {album_artist}")
+        if album_publish_time:
+            publish_date = time.strftime('%Y-%m-%d', time.localtime(album_publish_time / 1000))
+            logger.info(f"Publish Date: {publish_date}")
         logger.info(f"Song Count: {len(song_list)}")
         logger.info("-" * 60)
 
@@ -366,6 +370,7 @@ def get_song_ids_by_album_id(album_id: str) -> Dict[str, Any]:
             "album_id": album_id,
             "album_name": album_name,
             "album_artist": album_artist,
+            "album_publish_time": album_publish_time,
             "song_count": len(song_ids),
             "song_ids": song_ids,
             "song_details": song_details,
@@ -952,8 +957,17 @@ def prepare_album_folder(album_metadata: Dict[str, Any], download_dir: str = Non
         album_name = album_metadata.get('album_name', 'Unknown Album')
         album_artist = album_metadata.get('album_artist', 'Unknown Artist')
         album_id = album_metadata.get('album_id', '')
+        album_publish_time = album_metadata.get('album_publish_time')
         song_count = album_metadata.get('song_count', 0)
         raw_data = album_metadata.get('raw_data', {})
+        
+        # Convert publish timestamp to formatted date
+        publish_date_str = ''
+        if album_publish_time:
+            try:
+                publish_date_str = time.strftime('%Y-%m-%d', time.localtime(album_publish_time / 1000))
+            except (ValueError, OSError):
+                logger.warning(f"Could not convert publish time: {album_publish_time}")
         
         # Get album description from raw data
         album_description = ''
@@ -974,8 +988,11 @@ def prepare_album_folder(album_metadata: Dict[str, Any], download_dir: str = Non
         safe_album_name = re.sub(r'[<>:"/\\|?*]', illegal_char_replacement, album_name)
         safe_artist = re.sub(r'[<>:"/\\|?*]', illegal_char_replacement, album_artist)
         
-        # Create album folder name: Artist - Album Name
-        album_folder_name = f"{safe_artist} - {safe_album_name}"
+        # Create album folder name: Artist - Album Name (yyyy-MM-dd)
+        if publish_date_str:
+            album_folder_name = f"{safe_artist} - {safe_album_name} ({publish_date_str})"
+        else:
+            album_folder_name = f"{safe_artist} - {safe_album_name}"
         album_folder_path = os.path.join(download_dir, album_folder_name)
         
         # Create album folder
@@ -989,6 +1006,8 @@ def prepare_album_folder(album_metadata: Dict[str, Any], download_dir: str = Non
                 f.write(f"Album: {album_name}\n")
                 f.write(f"Artist: {album_artist}\n")
                 f.write(f"Album ID: {album_id}\n")
+                if publish_date_str:
+                    f.write(f"Publish Date: {publish_date_str}\n")
                 f.write(f"Song Count: {song_count}\n")
                 f.write("\n" + "="*60 + "\n")
                 f.write("Description:\n\n")
@@ -1077,14 +1096,14 @@ def download_playlist(playlist_id: str, index_ids: list, level: str = None):
 
 if __name__ == "__main__":
     # Part-1 Download Song by Song ID
-    # https://music.163.com/song?id=2742958669
-    # download_song("2742958669")
+    # https://music.163.com/song?id=2755710644
+    # download_song("445665094")
 
     indexes = []
     # indexes = [4, 6, 15, 18, 19]
 
     # Part-2 Download Songs by Album ID
-    download_album("489913", indexes)
+    download_album("39355990", indexes)
 
     # Part-3 Download Playlist
     # download_playlist("5453912201", indexes)
