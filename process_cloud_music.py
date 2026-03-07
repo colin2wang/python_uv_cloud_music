@@ -919,7 +919,7 @@ def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str
         else:
             logger.info("Skipping cover embedding (disabled in config)")
 
-        logger.info(f"\n🎉 Download completed! Files saved in: {download_dir}")
+        logger.info(f"\nDownload completed! Files saved in: {download_dir}")
         return True
 
     except KeyError as e:
@@ -1103,7 +1103,7 @@ if __name__ == "__main__":
     # indexes = [4, 6, 15, 18, 19]
 
     # Part-2 Download Songs by Album ID
-    download_album("39355990", indexes)
+    download_album("146844275", indexes)
 
     # Part-3 Download Playlist
     # download_playlist("5453912201", indexes)
