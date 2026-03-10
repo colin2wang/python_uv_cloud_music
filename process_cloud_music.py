@@ -21,7 +21,7 @@ logger = setup_logger(__name__)
 class NeteaseMusicToolAPI:
     """
     Netease Music API Client
-    
+
     Provides methods to interact with Netease Cloud Music API,
     including search, song parsing, playlist parsing, and album parsing.
     """
@@ -29,7 +29,7 @@ class NeteaseMusicToolAPI:
     def __init__(self, base_url: str = None):
         """
         Initialize the Netease Music API client
-        
+
         Args:
             base_url: Base URL for the API endpoint (default: from config)
         """
@@ -57,11 +57,11 @@ class NeteaseMusicToolAPI:
     def _extract_id(self, text: str, pattern_type: str = 'song') -> str:
         """
         Extract ID from URL or text
-        
+
         Args:
             text: Input text which may contain a URL or ID
             pattern_type: Type of pattern to match ('song', 'playlist', or 'album')
-            
+
         Returns:
             Extracted numeric ID or original text if no ID found
         """
@@ -91,11 +91,11 @@ class NeteaseMusicToolAPI:
     def search(self, keyword: str, limit: int = 10) -> str:
         """
         Search for songs by keyword
-        
+
         Args:
             keyword: Search term to find songs
             limit: Maximum number of results to return (default: 10)
-            
+
         Returns:
             JSON response string containing search results
         """
@@ -112,11 +112,11 @@ class NeteaseMusicToolAPI:
     def parse_song(self, song_id_or_url: str, level: str = "lossless") -> str:
         """
         Parse song details from ID or URL
-        
+
         Args:
             song_id_or_url: Song ID or URL to parse
             level: Audio quality level ('lossless', 'exhigh', 'standard', etc.)
-            
+
         Returns:
             JSON response string containing song details
         """
@@ -134,10 +134,10 @@ class NeteaseMusicToolAPI:
     def parse_playlist(self, playlist_id_or_url: str) -> str:
         """
         Parse playlist details from ID or URL
-        
+
         Args:
             playlist_id_or_url: Playlist ID or URL to parse
-            
+
         Returns:
             JSON response string containing playlist details
         """
@@ -156,10 +156,10 @@ class NeteaseMusicToolAPI:
     def parse_album(self, album_id_or_url: str) -> str:
         """
         Parse album details from ID or URL
-        
+
         Args:
             album_id_or_url: Album ID or URL to parse
-            
+
         Returns:
             JSON response string containing album details
         """
@@ -182,7 +182,7 @@ quality_levels = ["lossless", "exhigh", "standard"]
 def random_sleep(max_delay: float = None):
     """
     Add random delay to avoid frequent requests
-    
+
     Args:
         max_delay: Maximum delay in seconds (default: from config)
     """
@@ -250,13 +250,13 @@ def get_song_ids_by_playlist_id(playlist_id: str) -> Dict[str, Any]:
         # Extract all song IDs
         song_ids = []
         song_details = []
-        
+
         for i, song in enumerate(song_list, 1):
             song_id = song.get('id')
             song_name = song.get('name', 'Unknown Song')
             # Handle artist information
             song_artists = song.get('artists', 'Unknown Artist')
-        
+
             if song_id:
                 song_ids.append(str(song_id))
                 song_details.append({
@@ -343,7 +343,6 @@ def get_song_ids_by_album_id(album_id: str) -> Dict[str, Any]:
         logger.info(f"Song Count: {len(song_list)}")
         logger.info("-" * 60)
 
-
         # Extract all song IDs
         song_ids = []
         song_details = []
@@ -401,7 +400,7 @@ def get_song_metadata_by_song_id(song_id: str, level: str = None) -> Dict[str, A
     """
     try:
         api = NeteaseMusicToolAPI(config.get_api_base_url())
-        
+
         # Use default quality from config if not specified
         if level is None:
             level = config.get_default_quality()
@@ -429,7 +428,8 @@ def get_song_metadata_by_song_id(song_id: str, level: str = None) -> Dict[str, A
                         logger.info(f"Found available quality: {qual}")
                         break
                     else:
-                        logger.warning(f"Quality {qual} not available: {temp_result.get('data', {}).get('msg', 'Unknown reason')}")
+                        logger.warning(
+                            f"Quality {qual} not available: {temp_result.get('data', {}).get('msg', 'Unknown reason')}")
                 except json.JSONDecodeError:
                     logger.error(f"Quality {qual} parsing failed")
                     continue
@@ -786,7 +786,7 @@ def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str
         # Use default download directory from config if not specified
         if download_dir is None:
             download_dir = config.get_download_dir()
-        
+
         # Get configuration values
         add_index = config.should_add_index()
         index_format = config.get_index_format()
@@ -832,6 +832,31 @@ def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str
             filename = f"{safe_artist} - {safe_song_name}"
         else:
             filename = f"{safe_artist} - {safe_song_name}"
+        
+        # Check and truncate filename if too long (Windows MAX_PATH = 260 characters)
+        # Reserve some space for download directory and safety margin
+        max_filename_length = 200  # Conservative limit to avoid path length issues
+        if len(filename) > max_filename_length:
+            logger.warning(f"Filename too long ({len(filename)} chars), truncating to {max_filename_length} chars")
+            # Keep the index prefix if present, truncate the rest
+            if idx is not None and add_index:
+                # Preserve index part and truncate artist and title
+                formatted_index = f"{idx:{index_format}}"
+                # Calculate available space for artist and title
+                available_length = max_filename_length - len(formatted_index) - 4  # 4 for " - "
+                # Truncate artist and title proportionally
+                total_original = len(safe_artist) + len(safe_song_name)
+                if total_original > 0:
+                    artist_ratio = len(safe_artist) / total_original
+                    max_artist_len = int(available_length * artist_ratio * 0.5)  # 50% for artist
+                    max_song_len = available_length - max_artist_len - 3  # 3 for " - "
+                    safe_artist = safe_artist[:max_artist_len]
+                    safe_song_name = safe_song_name[:max_song_len]
+                filename = f"{formatted_index} - {safe_artist} - {safe_song_name}"
+            else:
+                filename = filename[:max_filename_length]
+            logger.info(f"Truncated filename: {filename}")
+        
         music_file_path = os.path.join(download_dir, f"{filename}{file_extension}")
         lyric_file_path = os.path.join(download_dir, f"{filename}.lrc")
         cover_file_path = os.path.join(download_dir, f"{filename}.jpg")
@@ -940,11 +965,11 @@ def download_song(song_id: str, level: str = None):
 def prepare_album_folder(album_metadata: Dict[str, Any], download_dir: str = None) -> str:
     """
     Create album folder with description file and cover image
-    
+
     Args:
         album_metadata: Dictionary containing album information
         download_dir: Base download directory path
-        
+
     Returns:
         Path to the created album folder
     """
@@ -952,7 +977,7 @@ def prepare_album_folder(album_metadata: Dict[str, Any], download_dir: str = Non
         # Use default download directory from config if not specified
         if download_dir is None:
             download_dir = config.get_download_dir()
-        
+
         # Get album information
         album_name = album_metadata.get('album_name', 'Unknown Album')
         album_artist = album_metadata.get('album_artist', 'Unknown Artist')
@@ -960,7 +985,7 @@ def prepare_album_folder(album_metadata: Dict[str, Any], download_dir: str = Non
         album_publish_time = album_metadata.get('album_publish_time')
         song_count = album_metadata.get('song_count', 0)
         raw_data = album_metadata.get('raw_data', {})
-        
+
         # Convert publish timestamp to formatted date
         publish_date_str = ''
         if album_publish_time:
@@ -968,37 +993,37 @@ def prepare_album_folder(album_metadata: Dict[str, Any], download_dir: str = Non
                 publish_date_str = time.strftime('%Y-%m-%d', time.localtime(album_publish_time / 1000))
             except (ValueError, OSError):
                 logger.warning(f"Could not convert publish time: {album_publish_time}")
-        
+
         # Get album description from raw data
         album_description = ''
         try:
             album_description = raw_data.get('data', {}).get('album', {}).get('description', '')
         except (AttributeError, KeyError):
             logger.warning(f"Could not extract album description")
-        
+
         # Get album cover URL from raw data
         album_cover_url = ''
         try:
             album_cover_url = raw_data.get('data', {}).get('album', {}).get('coverImgUrl', '')
         except (AttributeError, KeyError):
             logger.warning(f"Could not extract album cover URL")
-        
+
         # Clean illegal characters from folder name
         illegal_char_replacement = config.get_illegal_char_replacement()
         safe_album_name = re.sub(r'[<>:"/\\|?*]', illegal_char_replacement, album_name)
         safe_artist = re.sub(r'[<>:"/\\|?*]', illegal_char_replacement, album_artist)
-        
+
         # Create album folder name: Artist - Album Name (yyyy-MM-dd)
         if publish_date_str:
             album_folder_name = f"{safe_artist} - {safe_album_name} ({publish_date_str})"
         else:
             album_folder_name = f"{safe_artist} - {safe_album_name}"
         album_folder_path = os.path.join(download_dir, album_folder_name)
-        
+
         # Create album folder
         os.makedirs(album_folder_path, exist_ok=True)
         logger.info(f"Created album folder: {album_folder_path}")
-        
+
         # Create description file
         description_file_path = os.path.join(album_folder_path, 'album_info.txt')
         try:
@@ -1009,13 +1034,13 @@ def prepare_album_folder(album_metadata: Dict[str, Any], download_dir: str = Non
                 if publish_date_str:
                     f.write(f"Publish Date: {publish_date_str}\n")
                 f.write(f"Song Count: {song_count}\n")
-                f.write("\n" + "="*60 + "\n")
+                f.write("\n" + "=" * 60 + "\n")
                 f.write("Description:\n\n")
                 f.write(album_description if album_description else "No description available")
             logger.info(f"Created album description file: {os.path.basename(description_file_path)}")
         except Exception as e:
             logger.error(f"Failed to create description file: {str(e)}")
-        
+
         # Download cover image
         if album_cover_url and config.should_write_cover():
             cover_file_path = os.path.join(album_folder_path, 'cover.jpg')
@@ -1024,7 +1049,7 @@ def prepare_album_folder(album_metadata: Dict[str, Any], download_dir: str = Non
                 random_sleep()
                 cover_response = requests.get(album_cover_url + '?param=600x600', timeout=10)
                 cover_response.raise_for_status()
-                
+
                 with open(cover_file_path, 'wb') as f:
                     f.write(cover_response.content)
                 logger.info(f"Album cover downloaded: {os.path.basename(cover_file_path)}")
@@ -1032,10 +1057,10 @@ def prepare_album_folder(album_metadata: Dict[str, Any], download_dir: str = Non
                 logger.warning(f"Album cover download failed: {str(e)}")
         else:
             logger.warning("No album cover found or cover download disabled")
-        
+
         logger.info(f"Album folder prepared successfully: {album_folder_path}")
         return album_folder_path
-        
+
     except Exception as e:
         logger.error(f"Failed to prepare album folder: {str(e)}")
         return None
@@ -1071,6 +1096,7 @@ def download_album(album_id: str, index_ids: list, level: str = None):
     album_name = album_metadata['album_name']
     logger.info(f"Completed downloading album: {album_artist} - {album_name}")
 
+
 def download_playlist(playlist_id: str, index_ids: list, level: str = None):
     if level is None:
         level = config.get_default_quality()
@@ -1096,14 +1122,14 @@ def download_playlist(playlist_id: str, index_ids: list, level: str = None):
 
 if __name__ == "__main__":
     # Part-1 Download Song by Song ID
-    # https://music.163.com/song?id=314623
-    # download_song("314623")
+    # https://music.163.com/song?id=28306414
+    # download_song("28306414")
 
-    indexes = []
+    indexes = [1]
     # indexes = [4, 6, 15, 18, 19]
 
     # Part-2 Download Songs by Album ID
-    download_album("88602436", indexes)
+    download_album("75077927", indexes)
 
     # Part-3 Download Playlist
     # download_playlist("5453912201", indexes)
