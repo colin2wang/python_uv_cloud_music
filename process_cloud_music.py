@@ -35,15 +35,16 @@ class NeteaseMusicToolAPI:
         """
         self.base_url = (base_url or config.get_api_base_url()).rstrip('/')
         self.session = requests.Session()
+        
         # Set browser-simulated request headers (excluding HTTP/2 pseudo-headers)
         self.session.headers.update({
             'accept': 'application/json, text/javascript, */*; q=0.01',
             'accept-encoding': 'gzip, deflate, br, zstd',
             'accept-language': 'zh-CN,zh;q=0.9',
             'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'origin': 'https://musicapi.lxchen.cn',
+            'origin': base_url,
             'priority': 'u=1, i',
-            'referer': 'https://musicapi.lxchen.cn/',
+            'referer': base_url,
             'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"',
             'sec-ch-ua-mobile': '?0',
             'sec-ch-ua-platform': '"Windows"',
@@ -203,7 +204,7 @@ def get_song_ids_by_playlist_id(playlist_id: str) -> Dict[str, Any]:
     Returns:
         Dictionary containing playlist information and song ID list
     """
-    api = NeteaseMusicToolAPI("https://musicapi.lxchen.cn")
+    api = NeteaseMusicToolAPI(config.get_api_base_url())
 
     logger.info("=" * 60)
     logger.info("Extract Songs from Playlist ID")
@@ -301,7 +302,7 @@ def get_song_ids_by_album_id(album_id: str) -> Dict[str, Any]:
     Returns:
         Dictionary containing album information and song ID list
     """
-    api = NeteaseMusicToolAPI("https://musicapi.lxchen.cn")
+    api = NeteaseMusicToolAPI(config.get_api_base_url())
 
     logger.info("=" * 60)
     logger.info("Extract Songs from Album ID")
@@ -1125,11 +1126,11 @@ if __name__ == "__main__":
     # https://music.163.com/song?id=28306414
     # download_song("28306414")
 
-    indexes = [1]
+    indexes = []
     # indexes = [4, 6, 15, 18, 19]
 
     # Part-2 Download Songs by Album ID
-    download_album("75077927", indexes)
+    download_album("2848246", indexes)
 
     # Part-3 Download Playlist
     # download_playlist("5453912201", indexes)

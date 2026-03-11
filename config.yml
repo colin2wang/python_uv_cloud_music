@@ -3,7 +3,8 @@
 
 # API 配置
 api:
-  base_url: "https://musicapi.lxchen.cn"
+#  base_url: "https://musicapi.lxchen.cn"
+  base_url: "https://dm.jfjt.cc/"
 
 # 下载配置
 download:
