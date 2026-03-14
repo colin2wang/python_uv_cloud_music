@@ -910,6 +910,14 @@ def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str
         else:
             logger.warning(f"Metadata writing failed, but file has been downloaded normally")
 
+            # Retry, until success
+            retry_count = 0
+            while True:
+                logger.info(f"[{retry_count}] re-try to write metadata...")
+                retry_count += 1
+                if write_metadata_to_file(music_file_path, metadata_for_tagging):
+                    break
+
         # Download lyrics
         if lyric and config.should_write_lyrics():
             logger.info("Saving lyrics...")
@@ -1123,14 +1131,14 @@ def download_playlist(playlist_id: str, index_ids: list, level: str = None):
 
 if __name__ == "__main__":
     # Part-1 Download Song by Song ID
-    # https://music.163.com/song?id=28306414
-    # download_song("28306414")
+    # https://music.163.com/song?id=31545740
+    download_song("1426112587")
 
     indexes = []
     # indexes = [4, 6, 15, 18, 19]
 
     # Part-2 Download Songs by Album ID
-    download_album("2848246", indexes)
+    # download_album("72977516", indexes)
 
     # Part-3 Download Playlist
     # download_playlist("5453912201", indexes)
