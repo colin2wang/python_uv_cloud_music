@@ -573,7 +573,7 @@ if __name__ == "__main__":
     # Example usage
     
     # Example 1: Fix single album folder
-    fix_album_metadata(r"F:\Workspaces\JetBrains\PyCharm\python_uv_cloud_music\downloads\[Ready]\コナミ矩形波倶楽部 - 激亀忍者伝「T.M.N.T.Ⅰ+Ⅱ+トーナメント」FC国内版＆NES海外版全曲集 (1993-12-10)")
+    fix_album_metadata(r"N:\我的音乐\我的专辑\动漫原声\澤野弘之 - TVアニメ「進撃の巨人」Season 2 オリジナルサウンドトラック (2017-06-07)")
     
     # Example 2: Fix multiple album folders
     # download_dir = config.get_download_dir()

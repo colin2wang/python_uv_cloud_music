@@ -494,6 +494,7 @@ def write_metadata_to_file(file_path: str, metadata: Dict[str, Any]) -> bool:
         lyric = metadata.get('lyric', '')
         cover_path = metadata.get('cover_path', '')
         track_number = metadata.get('track_number', '')
+        song_id = metadata.get('id', '')
 
         logger.info(f"Writing metadata to {os.path.basename(file_path)}...")
 
@@ -520,6 +521,11 @@ def write_metadata_to_file(file_path: str, metadata: Dict[str, Any]) -> bool:
             if track_number:
                 from mutagen.id3 import TRCK
                 audio_file.add(TRCK(encoding=3, text=track_number))
+
+            # NetEase Cloud Music Song ID
+            if song_id:
+                from mutagen.id3 import TXXX
+                audio_file.add(TXXX(encoding=3, desc='CMUSIC_ID', text=song_id))
 
             # Comments (lyrics)
             if lyric:
@@ -556,6 +562,8 @@ def write_metadata_to_file(file_path: str, metadata: Dict[str, Any]) -> bool:
                 audio_file['LYRICS'] = lyric
             if track_number:
                 audio_file['TRACKNUMBER'] = track_number
+            if song_id:
+                audio_file['CMUSIC_ID'] = song_id
 
             # Add cover
             if cover_path and os.path.exists(cover_path):
@@ -589,6 +597,8 @@ def write_metadata_to_file(file_path: str, metadata: Dict[str, Any]) -> bool:
                 mp4_tags['\xa9lyr'] = lyric[:1000]  # Lyrics
             if track_number:
                 mp4_tags['trkn'] = [(int(track_number), 0)]  # Track number for MP4
+            if song_id:
+                mp4_tags['----:CMUSIC_ID'] = song_id.encode('utf-8')  # Music Song ID
 
             # Add cover
             if cover_path and os.path.exists(cover_path):
@@ -1131,14 +1141,14 @@ def download_playlist(playlist_id: str, index_ids: list, level: str = None):
 
 if __name__ == "__main__":
     # Part-1 Download Song by Song ID
-    # https://music.163.com/song?id=31545740
-    download_song("2615436134")
+    # https://music.163.com/song?id=2052368104
+    # download_song("1419685880")
 
-    indexes = []
+    indexes = [999]
     # indexes = [4, 6, 15, 18, 19]
 
     # Part-2 Download Songs by Album ID
-    # download_album("2769432", indexes)
+    download_album("513603", indexes)
 
     # Part-3 Download Playlist
     # download_playlist("5453912201", indexes)
