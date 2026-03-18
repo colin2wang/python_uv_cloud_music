@@ -523,7 +523,7 @@ def write_metadata_to_file(file_path: str, metadata: Dict[str, Any]) -> bool:
 
             # Comments (lyrics)
             if lyric:
-                audio_file.add(COMM(encoding=3, lang='eng', desc='', text=lyric[:1000]))  # Limit length
+                audio_file.add(COMM(encoding=3, lang='eng', desc='', text=lyric))  # Limit length
 
             # Cover image
             if cover_path and os.path.exists(cover_path):
@@ -553,7 +553,7 @@ def write_metadata_to_file(file_path: str, metadata: Dict[str, Any]) -> bool:
             if album:
                 audio_file['ALBUM'] = album
             if lyric:
-                audio_file['LYRICS'] = lyric[:1000]
+                audio_file['LYRICS'] = lyric
             if track_number:
                 audio_file['TRACKNUMBER'] = track_number
 
@@ -1132,13 +1132,13 @@ def download_playlist(playlist_id: str, index_ids: list, level: str = None):
 if __name__ == "__main__":
     # Part-1 Download Song by Song ID
     # https://music.163.com/song?id=31545740
-    # download_song("506553594")
+    download_song("2615436134")
 
     indexes = []
     # indexes = [4, 6, 15, 18, 19]
 
     # Part-2 Download Songs by Album ID
-    download_album("495165", indexes)
+    # download_album("2769432", indexes)
 
     # Part-3 Download Playlist
     # download_playlist("5453912201", indexes)
