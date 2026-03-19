@@ -140,6 +140,8 @@ class AlbumLyricFixer:
         # Supported audio formats
         audio_extensions = ['.mp3', '.flac', '.m4a', '.mp4', '.aac']
         
+        logger.debug(f"Searching for file with song_name: {safe_song_name}, artist: {safe_artist}")
+        
         # Try to match file with pattern: {index} - {artist} - {title}
         for ext in audio_extensions:
             # Pattern with index
@@ -156,13 +158,46 @@ class AlbumLyricFixer:
                 logger.info(f"Found music file (without index): {matches[0].name}")
                 return matches[0]
         
-        # Try fuzzy matching (partial match)
+        # Try fuzzy matching (partial match) - more flexible
         for ext in audio_extensions:
             for file_path in self.album_folder.glob(f"*{ext}"):
                 filename_lower = file_path.name.lower()
-                if safe_song_name.lower() in filename_lower and safe_artist.lower() in filename_lower:
+                song_name_lower = safe_song_name.lower()
+                artist_lower = safe_artist.lower()
+                
+                # Check if both song name and artist are in filename
+                if song_name_lower in filename_lower and artist_lower in filename_lower:
                     logger.info(f"Found music file (fuzzy match): {file_path.name}")
                     return file_path
+                
+                # Try matching with song name only (for instrumental tracks)
+                if song_name_lower in filename_lower and len(song_name_lower) > 3:
+                    # Extract just the song name part (remove special chars for comparison)
+                    clean_song = re.sub(r'[!？。、，\s]+', '', song_name_lower)
+                    clean_filename = re.sub(r'[!？。、，\s]+', '', filename_lower)
+                    if clean_song in clean_filename:
+                        logger.info(f"Found music file (song name match): {file_path.name}")
+                        return file_path
+        
+        # Try matching with reversed artist order (e.g., "A/B" vs "B/A")
+        if '/' in safe_artist:
+            parts = safe_artist.split('/')
+            reversed_artist = '/'.join(reversed(parts))
+            logger.debug(f"Trying reversed artist order: {reversed_artist}")
+            
+            for ext in audio_extensions:
+                pattern_with_reversed = f"* - {reversed_artist} - {safe_song_name}{ext}"
+                matches = list(self.album_folder.glob(pattern_with_reversed))
+                if matches:
+                    logger.info(f"Found music file (reversed artist): {matches[0].name}")
+                    return matches[0]
+                
+                # Fuzzy match with reversed artist
+                for file_path in self.album_folder.glob(f"*{ext}"):
+                    filename_lower = file_path.name.lower()
+                    if safe_song_name.lower() in filename_lower and reversed_artist.lower() in filename_lower:
+                        logger.info(f"Found music file (fuzzy + reversed artist): {file_path.name}")
+                        return file_path
         
         logger.warning(f"Music file not found for: {song_name} - {artist}")
         return None
@@ -576,7 +611,7 @@ if __name__ == "__main__":
     
     # Example 1: Fix single album folder
     # Provide your album folder path here
-    album_folder_path = r"J:\我的音乐\我的专辑\华语流行\Beyond - Beyond Best Live (2016-02-17)"
+    album_folder_path = r"J:\我的音乐\我的专辑\动漫原声\高橋洋子 - 魂のルフラン_THANATOS -IF I CAN'T BE YOURS- (2021-02-26)"
     fix_album_lyrics(album_folder_path)
     
     # Example 2: Fix multiple album folders

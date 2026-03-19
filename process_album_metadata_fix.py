@@ -573,7 +573,7 @@ if __name__ == "__main__":
     # Example usage
     
     # Example 1: Fix single album folder
-    fix_album_metadata(r"N:\我的音乐\我的专辑\动漫原声\澤野弘之 - TVアニメ「進撃の巨人」Season 2 オリジナルサウンドトラック (2017-06-07)")
+    fix_album_metadata(r"J:\我的音乐\我的专辑\动漫原声\鷺巣詩郎 - NEON GENESIS EVANGELION SOUNDTRACK 25th ANNIVERSARY BOX (2020-10-07)")
     
     # Example 2: Fix multiple album folders
     # download_dir = config.get_download_dir()
