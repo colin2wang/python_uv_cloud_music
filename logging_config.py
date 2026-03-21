@@ -58,7 +58,7 @@ LOG_FILE_NAME = f"cloud_music_{_timestamp}.log"
 LOG_FILE_PATH = LOG_DIR / LOG_FILE_NAME
 
 # 5. Define Formats
-LOG_FORMAT = "%(asctime)s - [%(levelname)s] - %(name)s - %(message)s"
+LOG_FORMAT = "%(asctime)s - [%(levelname)s] - %(name)s - %(filename)s:%(lineno)d - %(message)s"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 

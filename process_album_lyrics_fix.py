@@ -137,10 +137,15 @@ class AlbumLyricFixer:
         safe_song_name = re.sub(r'[<>:"/\\|?*]', illegal_char_replacement, song_name)
         safe_artist = re.sub(r'[<>:"/\\|?*]', illegal_char_replacement, artist)
         
+        # Keep original artist name for generating variations (before cleaning illegal chars)
+        original_artist = artist
+        
         # Supported audio formats
         audio_extensions = ['.mp3', '.flac', '.m4a', '.mp4', '.aac']
         
-        logger.debug(f"Searching for file with song_name: {safe_song_name}, artist: {safe_artist}")
+        logger.info(f"Searching for file with song_name: {safe_song_name}, artist: {safe_artist}")
+        logger.info(f"Original artist: {original_artist}")
+        logger.debug(f"Album folder: {self.album_folder}")
         
         # Try to match file with pattern: {index} - {artist} - {title}
         for ext in audio_extensions:
@@ -159,16 +164,82 @@ class AlbumLyricFixer:
                 return matches[0]
         
         # Try fuzzy matching (partial match) - more flexible
+        logger.debug("Starting fuzzy matching...")
+        
+        # List all music files for debugging
+        all_music_files = []
+        for ext in audio_extensions:
+            all_music_files.extend(self.album_folder.glob(f"*{ext}"))
+        logger.debug(f"Total music files found: {len(all_music_files)}")
+        for mf in all_music_files[:10]:  # Log first 10 files
+            logger.debug(f"  {mf.name}")
+        
         for ext in audio_extensions:
             for file_path in self.album_folder.glob(f"*{ext}"):
                 filename_lower = file_path.name.lower()
                 song_name_lower = safe_song_name.lower()
                 artist_lower = safe_artist.lower()
+                original_artist_lower = original_artist.lower()
                 
-                # Check if both song name and artist are in filename
-                if song_name_lower in filename_lower and artist_lower in filename_lower:
-                    logger.info(f"Found music file (fuzzy match): {file_path.name}")
-                    return file_path
+                logger.debug(f"Checking file: {file_path.name}")
+                
+                # Generate variations of artist name with different separators and orders
+                artist_variations = [artist_lower, original_artist_lower]
+                
+                # Try different separator variations for safe_artist (with _)
+                separators_safe = ['_', ', ', ',', ' & ', '&']
+                for sep1 in separators_safe:
+                    if sep1 in artist_lower:
+                        # Replace with all other separators
+                        for sep2 in separators_safe:
+                            if sep1 != sep2:
+                                # Forward order
+                                variation = artist_lower.replace(sep1, sep2)
+                                if variation not in artist_variations:
+                                    artist_variations.append(variation)
+                                
+                                # Reversed order
+                                parts = [p.strip() for p in artist_lower.split(sep1) if p.strip()]
+                                if len(parts) >= 2:
+                                    reversed_variation = sep2.join(reversed(parts))
+                                    if reversed_variation not in artist_variations:
+                                        artist_variations.append(reversed_variation)
+                
+                # Try different separator variations for original_artist (with /)
+                separators_original = ['/', ', ', ',', ' & ', '&']
+                for sep1 in separators_original:
+                    if sep1 in original_artist_lower:
+                        # Replace with all other separators
+                        for sep2 in separators_original:
+                            if sep1 != sep2:
+                                # Forward order
+                                variation = original_artist_lower.replace(sep1, sep2)
+                                if variation not in artist_variations:
+                                    artist_variations.append(variation)
+                                
+                                # Reversed order
+                                parts = [p.strip() for p in original_artist_lower.split(sep1) if p.strip()]
+                                if len(parts) >= 2:
+                                    reversed_variation = sep2.join(reversed(parts))
+                                    if reversed_variation not in artist_variations:
+                                        artist_variations.append(reversed_variation)
+                
+                # Debug: Log variations for first file if debug level
+                if logger.level <= 10:  # DEBUG level
+                    logger.debug(f"Artist variations for '{artist_lower}': {artist_variations}")
+                else:
+                    # Log variations for the song we're looking for
+                    if song_name_lower in filename_lower:
+                        logger.info(f"  Song name matched in: {file_path.name}")
+                        logger.info(f"  Checking artist variations: {artist_variations}")
+                
+                # Try each artist variation
+                for artist_variant in artist_variations:
+                    # Check if both song name and artist are in filename
+                    if song_name_lower in filename_lower and artist_variant in filename_lower:
+                        logger.info(f"Found music file (fuzzy match): {file_path.name}")
+                        logger.info(f"  Matched artist variation: '{artist_variant}'")
+                        return file_path
                 
                 # Try matching with song name only (for instrumental tracks)
                 if song_name_lower in filename_lower and len(song_name_lower) > 3:
@@ -180,24 +251,26 @@ class AlbumLyricFixer:
                         return file_path
         
         # Try matching with reversed artist order (e.g., "A/B" vs "B/A")
-        if '/' in safe_artist:
-            parts = safe_artist.split('/')
-            reversed_artist = '/'.join(reversed(parts))
-            logger.debug(f"Trying reversed artist order: {reversed_artist}")
-            
-            for ext in audio_extensions:
-                pattern_with_reversed = f"* - {reversed_artist} - {safe_song_name}{ext}"
-                matches = list(self.album_folder.glob(pattern_with_reversed))
-                if matches:
-                    logger.info(f"Found music file (reversed artist): {matches[0].name}")
-                    return matches[0]
+        # Check both safe_artist (with _) and original_artist (with /)
+        for sep, artist_source in [('_', safe_artist), ('/', original_artist)]:
+            if sep in artist_source:
+                parts = artist_source.split(sep)
+                reversed_artist = sep.join(reversed(parts))
+                logger.debug(f"Trying reversed artist order with separator '{sep}': {reversed_artist}")
                 
-                # Fuzzy match with reversed artist
-                for file_path in self.album_folder.glob(f"*{ext}"):
-                    filename_lower = file_path.name.lower()
-                    if safe_song_name.lower() in filename_lower and reversed_artist.lower() in filename_lower:
-                        logger.info(f"Found music file (fuzzy + reversed artist): {file_path.name}")
-                        return file_path
+                for ext in audio_extensions:
+                    pattern_with_reversed = f"* - {reversed_artist} - {safe_song_name}{ext}"
+                    matches = list(self.album_folder.glob(pattern_with_reversed))
+                    if matches:
+                        logger.info(f"Found music file (reversed artist): {matches[0].name}")
+                        return matches[0]
+                    
+                    # Fuzzy match with reversed artist
+                    for file_path in self.album_folder.glob(f"*{ext}"):
+                        filename_lower = file_path.name.lower()
+                        if safe_song_name.lower() in filename_lower and reversed_artist.lower() in filename_lower:
+                            logger.info(f"Found music file (fuzzy + reversed artist): {file_path.name}")
+                            return file_path
         
         logger.warning(f"Music file not found for: {song_name} - {artist}")
         return None
@@ -473,6 +546,55 @@ class AlbumLyricFixer:
         
         return all_have_cmusic_id, music_files
 
+    def check_file_has_cmusic_id(self, file_path: Path) -> tuple[bool, Optional[str]]:
+        """
+        Check if a music file has CMUSIC_ID tag
+        
+        Args:
+            file_path: Path to music file
+        
+        Returns:
+            tuple: (bool indicating if file has CMUSIC_ID, the CMUSIC_ID value if exists)
+        """
+        ext = file_path.suffix.lower()
+        has_cmusic_id = False
+        cmusic_id_value = None
+        
+        try:
+            if ext in ['.mp3', '.mp2', '.mp1']:
+                audio = ID3(file_path)
+                from mutagen.id3 import TXXX
+                for key in audio.keys():
+                    if key.startswith('TXXX'):
+                        frame = audio[key]
+                        if hasattr(frame, 'desc') and frame.desc == 'CMUSIC_ID':
+                            has_cmusic_id = True
+                            if frame.text:
+                                cmusic_id_value = str(frame.text[0])
+                            break
+                            
+            elif ext == '.flac':
+                audio = FLAC(file_path)
+                has_cmusic_id = 'CMUSIC_ID' in audio
+                if has_cmusic_id:
+                    cmusic_id_value = str(audio['CMUSIC_ID'][0])
+            
+            elif ext in ['.m4a', '.mp4', '.aac']:
+                audio = MP4(file_path)
+                has_cmusic_id = '----:com.apple.iTunes:CMUSIC_ID' in audio.tags if audio.tags else False
+                if has_cmusic_id:
+                    tag_value = audio.tags['----:com.apple.iTunes:CMUSIC_ID'][0]
+                    if isinstance(tag_value, bytes):
+                        cmusic_id_value = tag_value.decode('utf-8')
+                    else:
+                        cmusic_id_value = str(tag_value)
+        
+        except Exception as e:
+            logger.warning(f"Error checking CMUSIC_ID in {file_path.name}: {str(e)}")
+            has_cmusic_id = False
+        
+        return has_cmusic_id, cmusic_id_value
+
     def move_lrc_files_to_delete_subfolder(self) -> int:
         """
         Move all .lrc files in album folder to .delete subfolder
@@ -606,6 +728,23 @@ class AlbumLyricFixer:
                 })
                 continue
             
+            # Check if file already has CMUSIC_ID tag (skip if already fixed)
+            has_cmusic_id, existing_cmusic_id = self.check_file_has_cmusic_id(music_file)
+            
+            if has_cmusic_id:
+                logger.info(f"File already has CMUSIC_ID: {existing_cmusic_id}, skipping download and fix")
+                results['songs_skipped'] += 1
+                results['details'].append({
+                    'song_name': song_name,
+                    'artist': song_artists,
+                    'song_id': song_id,
+                    'file': music_file.name,
+                    'action': 'skipped',
+                    'reason': 'File already has CMUSIC_ID',
+                    'cmusic_id': existing_cmusic_id
+                })
+                continue
+            
             # Download complete lyric
             lyric = self.download_complete_lyric(song_id)
             
@@ -661,6 +800,7 @@ class AlbumLyricFixer:
         logger.info(f"Artist: {self.album_info.get('album_artist', 'Unknown')}")
         logger.info(f"Total songs in album: {results['total_songs']}")
         logger.info(f"Songs fixed: {results['songs_fixed']}")
+        logger.info(f"Songs skipped (already fixed): {results['songs_skipped']}")
         logger.info(f"Songs not found: {results['songs_not_found']}")
         logger.info(f"Songs failed: {results['songs_failed']}")
         
@@ -721,7 +861,7 @@ if __name__ == "__main__":
     
     # Example 1: Fix single album folder
     # Provide your album folder path here
-    album_folder_path = r"J:\我的音乐\我的专辑\华语流行\光泽 - 光泽 (2016-10-24)"
+    album_folder_path = r"J:\我的音乐\我的专辑\华语流行\江美琪 - 又寂寞又美丽 (2004-02-26)"
     fix_album_lyrics(album_folder_path)
     
     # Example 2: Fix multiple album folders
