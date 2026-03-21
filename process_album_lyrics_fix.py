@@ -394,6 +394,85 @@ class AlbumLyricFixer:
             logger.error(f"Failed to save LRC file: {str(e)}")
             return False
     
+    def check_all_music_files_have_cmusic_id(self) -> tuple[bool, List[Path]]:
+        """
+        Check if all music files in the album folder have CMUSIC_ID tag
+        
+        Returns:
+            tuple: (bool indicating if all files have CMUSIC_ID, list of music files found)
+        """
+        # Supported audio formats
+        audio_extensions = ['.mp3', '.flac', '.m4a', '.mp4', '.aac']
+        
+        # Find all music files in album folder
+        music_files = []
+        for ext in audio_extensions:
+            music_files.extend(self.album_folder.glob(f"*{ext}"))
+        
+        if not music_files:
+            logger.warning("No music files found in album folder")
+            return True, []
+        
+        logger.info(f"Found {len(music_files)} music files to check for CMUSIC_ID tag")
+        
+        all_have_cmusic_id = True
+        files_without_tag = []
+        
+        for file_path in music_files:
+            ext = file_path.suffix.lower()
+            has_cmusic_id = False
+            cmusic_id_value = None
+            
+            try:
+                if ext in ['.mp3', '.mp2', '.mp1']:
+                    audio = ID3(file_path)
+                    # Check for TXXX frame with desc='CMUSIC_ID'
+                    from mutagen.id3 import TXXX
+                    for key in audio.keys():
+                        if key.startswith('TXXX'):
+                            frame = audio[key]
+                            if hasattr(frame, 'desc') and frame.desc == 'CMUSIC_ID':
+                                has_cmusic_id = True
+                                # Extract the value (frame.text is a list)
+                                if frame.text:
+                                    cmusic_id_value = str(frame.text[0])
+                                break
+                                
+                elif ext == '.flac':
+                    audio = FLAC(file_path)
+                    has_cmusic_id = 'CMUSIC_ID' in audio
+                    if has_cmusic_id:
+                        # Extract the value (audio['CMUSIC_ID'] is a list)
+                        cmusic_id_value = str(audio['CMUSIC_ID'][0])
+                    
+                elif ext in ['.m4a', '.mp4', '.aac']:
+                    audio = MP4(file_path)
+                    # MP4 uses a special format for custom tags
+                    has_cmusic_id = '----:com.apple.iTunes:CMUSIC_ID' in audio.tags if audio.tags else False
+                    if has_cmusic_id:
+                        # Extract the value (tag value is a list of bytes)
+                        tag_value = audio.tags['----:com.apple.iTunes:CMUSIC_ID'][0]
+                        if isinstance(tag_value, bytes):
+                            cmusic_id_value = tag_value.decode('utf-8')
+                        else:
+                            cmusic_id_value = str(tag_value)
+                
+            except Exception as e:
+                logger.warning(f"Error checking CMUSIC_ID in {file_path.name}: {str(e)}")
+                has_cmusic_id = False
+            
+            if not has_cmusic_id:
+                all_have_cmusic_id = False
+                files_without_tag.append(file_path)
+                logger.info(f"  Missing CMUSIC_ID: {file_path.name}")
+            else:
+                if cmusic_id_value:
+                    logger.info(f"  Has CMUSIC_ID: {file_path.name} = {cmusic_id_value}")
+                else:
+                    logger.info(f"  Has CMUSIC_ID: {file_path.name}")
+        
+        return all_have_cmusic_id, music_files
+
     def move_lrc_files_to_delete_subfolder(self) -> int:
         """
         Move all .lrc files in album folder to .delete subfolder
@@ -438,10 +517,41 @@ class AlbumLyricFixer:
         logger.info(f"Starting lyric fix for album: {self.album_folder}")
         logger.info("=" * 60)
         
-        # Initialize API
+        # Step 1: Check if all music files already have CMUSIC_ID tag
+        logger.info("-" * 60)
+        logger.info("Checking if all music files already have CMUSIC_ID tag...")
+        logger.info("-" * 60)
+        
+        all_have_cmusic_id, music_files = self.check_all_music_files_have_cmusic_id()
+        
+        if all_have_cmusic_id:
+            logger.info("=" * 60)
+            logger.info("All music files already have CMUSIC_ID tag - Task completed")
+            logger.info("=" * 60)
+            return {
+                'success': True,
+                'message': 'All music files already have CMUSIC_ID tag',
+                'album_folder': str(self.album_folder),
+                'action': 'skipped',
+                'reason': 'All files already have CMUSIC_ID',
+                'total_files': len(music_files)
+            }
+        
+        if not music_files:
+            logger.error("No music files found in album folder")
+            return {
+                'success': False,
+                'message': 'No music files found in album folder',
+                'album_folder': str(self.album_folder)
+            }
+        
+        logger.info(f"Found {len(music_files)} music files, some without CMUSIC_ID tag")
+        logger.info("Proceeding with lyric fix process...")
+        
+        # Step 2: Initialize API
         self.api = NeteaseMusicToolAPI(config.get_api_base_url())
         
-        # Load album info
+        # Step 3: Load album info
         if not self.load_album_info():
             return {
                 'success': False,
@@ -449,7 +559,7 @@ class AlbumLyricFixer:
                 'album_folder': str(self.album_folder)
             }
         
-        # Fetch album songs
+        # Step 4: Fetch album songs
         if not self.fetch_album_songs():
             return {
                 'success': False,
@@ -457,7 +567,7 @@ class AlbumLyricFixer:
                 'album_folder': str(self.album_folder)
             }
         
-        # Process each song
+        # Step 5: Process each song
         results = {
             'success': True,
             'album_folder': str(self.album_folder),
@@ -611,7 +721,7 @@ if __name__ == "__main__":
     
     # Example 1: Fix single album folder
     # Provide your album folder path here
-    album_folder_path = r"J:\我的音乐\我的专辑\动漫原声\高橋洋子 - 魂のルフラン_THANATOS -IF I CAN'T BE YOURS- (2021-02-26)"
+    album_folder_path = r"J:\我的音乐\我的专辑\华语流行\光泽 - 光泽 (2016-10-24)"
     fix_album_lyrics(album_folder_path)
     
     # Example 2: Fix multiple album folders
