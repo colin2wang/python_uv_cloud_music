@@ -861,7 +861,7 @@ if __name__ == "__main__":
     
     # Example 1: Fix single album folder
     # Provide your album folder path here
-    album_folder_path = r"J:\我的音乐\我的专辑\华语流行\江美琪 - 又寂寞又美丽 (2004-02-26)"
+    album_folder_path = r"J:\我的音乐\我的专辑\华语流行\廖语晴 - 爱。现"
     fix_album_lyrics(album_folder_path)
     
     # Example 2: Fix multiple album folders
