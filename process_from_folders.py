@@ -211,7 +211,7 @@ def print_folders(folders: List[str], show_index: bool = False):
 
 def main():
     # 配置：设置目录
-    target_directory = r"J:\我的音乐\我的专辑\华语流行"
+    target_directory = r"J:\我的音乐\我的专辑\动漫原声"
 
     # 输出选项
     show_index = True  # 是否显示索引编号

@@ -203,6 +203,10 @@ class ConfigManager:
     def get_illegal_char_replacement(self) -> str:
         """Get replacement character for illegal filename characters"""
         return self.get('filename.illegal_char_replacement', '_')
+
+    def get_artist_delimiter_replacement(self) -> str:
+        """Get replacement character for artist delimiters"""
+        return self.get('filename.artist_delimiter_replacement', ', ')
     
     def should_write_metadata(self) -> bool:
         """Check if metadata should be written to files"""

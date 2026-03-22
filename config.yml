@@ -36,6 +36,9 @@ filename:
   # 非法字符替换为
   illegal_char_replacement: "_"
 
+  # 歌手分隔符替换为
+  artist_delimiter_replacement: ", "
+
 # 元数据写入配置
 metadata:
   # 是否写入元数据

@@ -1144,11 +1144,11 @@ if __name__ == "__main__":
     # https://music.163.com/song?id=2052368104
     # download_song("1419685880")
 
-    indexes = [9999]
+    indexes = []
     # indexes = [4, 6, 15, 18, 19]
 
     # Part-2 Download Songs by Album ID
-    download_album("250748750", indexes)
+    download_album("30465", indexes)
 
     # Part-3 Download Playlist
     # download_playlist("5453912201", indexes)
