@@ -2,7 +2,7 @@ import os
 import re
 import time
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Optional
 
 from mutagen.flac import FLAC
 from mutagen.id3 import ID3, COMM
@@ -11,6 +11,7 @@ from mutagen.mp4 import MP4
 from logging_config import setup_logger
 from config_manager import config
 from process_cloud_music import get_song_ids_by_album_id, get_song_metadata_by_song_id
+from utils import get_audio_extension, clean_filename, safe_get
 
 # Create logger
 logger = setup_logger(__name__)
@@ -130,10 +131,8 @@ class AlbumLyricFixer:
             Path to music file or None
         """
         # Clean illegal characters from song name and artist
-        illegal_char_replacement = config.get_illegal_char_replacement()
-        safe_song_name = re.sub(r'[<>:"/\\|?*]', illegal_char_replacement, song_name)
-        safe_artist = re.sub(r'/', config.get_artist_delimiter_replacement(), artist)
-        safe_artist = re.sub(r'[<>:"/\\|?*]', illegal_char_replacement, safe_artist)
+        safe_song_name = clean_filename(song_name)
+        safe_artist = clean_filename(artist.replace('/', config.get_artist_delimiter_replacement()))
         
         # Keep original artist name for generating variations (before cleaning illegal chars)
         original_artist = artist
@@ -242,8 +241,8 @@ class AlbumLyricFixer:
                 if song_name_lower in filename_lower and len(song_name_lower) > 3:
                     # Extract just the song name part (remove special chars for comparison)
                     clean_song = re.sub(r'[!？。、，\s]+', '', song_name_lower)
-                    clean_filename = re.sub(r'[!？。、，\s]+', '', filename_lower)
-                    if clean_song in clean_filename:
+                    clean_filename_text = re.sub(r'[!？。、，\s]+', '', filename_lower)
+                    if clean_song in clean_filename_text:
                         logger.info(f"Found music file (song name match): {file_path.name}")
                         return file_path
 
@@ -347,17 +346,18 @@ class AlbumLyricFixer:
                             logger.info(f"  Split lyric into {chunk_num} chunks")
                     
                     # Add first chunk as main lyric
+                    # Note: Use encoding=1 (UTF-16 with BOM) to properly preserve newlines
                     audio.add(COMM(
-                        encoding=3,
+                        encoding=1,
                         lang='eng',
                         desc='',
                         text=lyric_chunks[0]
                     ))
-                    
+
                     # Add additional chunks with numbered descriptions
                     for i, chunk in enumerate(lyric_chunks[1:], 2):
                         audio.add(COMM(
-                            encoding=3,
+                            encoding=1,
                             lang='eng',
                             desc=f'Lyric Part {i}',
                             text=chunk
@@ -441,19 +441,18 @@ class AlbumLyricFixer:
             logger.error(f"Failed to save LRC file: {str(e)}")
             return False
     
-    def check_all_music_files_have_cmusic_id(self) -> tuple[bool, List[Path], set]:
+    def check_all_music_files_have_cmusic_id(self) -> tuple[bool, list[Path], set]:
         """
-        Check if all music files in the album folder have CMUSIC_ID tag
+        Check if all music files in the album folder have CMUSIC_ID tag.
 
         Returns:
             tuple: (bool indicating if all files have CMUSIC_ID, list of music files found, set of filenames with CMUSIC_ID)
         """
-        # Supported audio formats
-        audio_extensions = ['.mp3', '.flac', '.m4a', '.mp4', '.aac']
+        from utils import AUDIO_EXTENSIONS
 
         # Find all music files in album folder
         music_files = []
-        for ext in audio_extensions:
+        for ext in AUDIO_EXTENSIONS:
             music_files.extend(self.album_folder.glob(f"*{ext}"))
 
         if not music_files:
@@ -599,9 +598,9 @@ class AlbumLyricFixer:
         logger.info(f"Total LRC files moved to .delete: {moved_count}")
         return moved_count
     
-    def scan_and_fix_lyrics(self) -> Dict[str, Any]:
+    def scan_and_fix_lyrics(self) -> dict:
         """
-        Scan album folder and fix lyrics for all music files
+        Scan album folder and fix lyrics for all music files.
 
         Returns:
             Dictionary with scan and fix results
@@ -888,9 +887,9 @@ class AlbumLyricFixer:
         return results
 
 
-def fix_album_lyrics(album_folder: str) -> Dict[str, Any]:
+def fix_album_lyrics(album_folder: str) -> dict:
     """
-    Convenience function to fix album lyrics
+    Convenience function to fix album lyrics.
 
     Args:
         album_folder: Path to album folder
@@ -902,9 +901,9 @@ def fix_album_lyrics(album_folder: str) -> Dict[str, Any]:
     return fixer.scan_and_fix_lyrics()
 
 
-def scan_multiple_albums_for_lyrics(album_folders: List[str]) -> List[Dict[str, Any]]:
+def scan_multiple_albums_for_lyrics(album_folders: list[str]) -> list[dict]:
     """
-    Scan and fix lyrics for multiple album folders
+    Scan and fix lyrics for multiple album folders.
 
     Args:
         album_folders: List of album folder paths
@@ -932,7 +931,7 @@ if __name__ == "__main__":
 
     # Example 1: Fix single album folder
     # Provide your album folder path here
-    album_folder_path = r"J:\我的音乐\我的专辑\华语流行\李泉 - 再见忧伤 (2014-06-03)"
+    album_folder_path = r"F:\Workspaces\JetBrains\PyCharm\python_uv_cloud_music\downloads\许茹芸 - 好歌茹芸 (2011-05-13)"
     fix_album_lyrics(album_folder_path)
 
     # Example 2: Fix multiple album folders

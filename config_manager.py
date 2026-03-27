@@ -5,7 +5,9 @@ This module handles loading and accessing configuration settings from config.yml
 """
 
 import os
-from typing import Any, Optional
+from pathlib import Path
+from typing import Any
+
 import yaml
 
 from logging_config import setup_logger
@@ -34,58 +36,60 @@ class ConfigManager:
         if self._config is None:
             self.load_config()
     
-    def load_config(self, config_path: Optional[str] = None) -> dict:
+    def load_config(self, config_path: str | None = None) -> dict:
         """
-        Load configuration from YAML file
-        
+        Load configuration from YAML file.
+
         Args:
             config_path: Path to config file (default: config.yml in project root)
-            
+
         Returns:
             Configuration dictionary
         """
         if config_path is None:
             # Try to find config.yml in the project root
             possible_paths = [
-                os.path.join(os.getcwd(), 'config.yml'),
-                os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.yml'),
+                Path.cwd() / 'config.yml',
+                Path(__file__).parent / 'config.yml',
             ]
-            
+
             for path in possible_paths:
-                if os.path.exists(path):
-                    config_path = path
+                if path.exists():
+                    config_path = str(path)
                     break
-            
-            if config_path is None or not os.path.exists(config_path):
+
+            if config_path is None:
                 logger.warning("config.yml not found, using default configuration")
                 self._config = self._get_default_config()
                 self._config_path = None
                 return self._config
-        
+
         try:
-            logger.info(f"Loading configuration from: {config_path}")
-            with open(config_path, 'r', encoding='utf-8') as f:
+            config_path_obj = Path(config_path)
+            logger.info(f"Loading configuration from: {config_path_obj}")
+
+            with open(config_path_obj, 'r', encoding='utf-8') as f:
                 self._config = yaml.safe_load(f)
-            
-            self._config_path = config_path
+
+            self._config_path = str(config_path_obj)
             logger.info("Configuration loaded successfully")
-            
+
             # Merge with default config to ensure all keys exist
             default_config = self._get_default_config()
             self._config = self._merge_configs(default_config, self._config)
-            
+
             return self._config
-            
+
         except FileNotFoundError:
             logger.warning(f"Config file not found: {config_path}, using defaults")
             self._config = self._get_default_config()
             return self._config
         except yaml.YAMLError as e:
-            logger.error(f"Error parsing config file: {str(e)}, using defaults")
+            logger.error(f"Error parsing config file: {e}, using defaults")
             self._config = self._get_default_config()
             return self._config
         except Exception as e:
-            logger.error(f"Unexpected error loading config: {str(e)}, using defaults")
+            logger.error(f"Unexpected error loading config: {e}, using defaults")
             self._config = self._get_default_config()
             return self._config
     
@@ -153,27 +157,27 @@ class ConfigManager:
     
     def get(self, key_path: str, default: Any = None) -> Any:
         """
-        Get configuration value by dot-notation key path
-        
+        Get configuration value by dot-notation key path.
+
         Args:
             key_path: Dot-separated path (e.g., 'download.default_dir')
             default: Default value if key not found
-            
+
         Returns:
             Configuration value or default
         """
         if self._config is None:
             return default
-        
+
         keys = key_path.split('.')
         value = self._config
-        
+
         for key in keys:
             if isinstance(value, dict) and key in value:
                 value = value[key]
             else:
                 return default
-        
+
         return value
     
     def get_api_base_url(self) -> str:

@@ -4,7 +4,8 @@ import random
 import re
 import time
 import urllib.parse
-from typing import Dict, Any
+from pathlib import Path
+from typing import Any
 
 import requests
 from mutagen.flac import FLAC, Picture
@@ -13,6 +14,10 @@ from mutagen.mp4 import MP4, MP4Cover
 
 from logging_config import setup_logger
 from config_manager import config
+from utils import (
+    get_audio_extension, is_audio_file, get_image_mime_type,
+    get_mp4_image_format, clean_filename, safe_get
+)
 
 # Create logger
 logger = setup_logger(__name__)
@@ -176,8 +181,8 @@ class NeteaseMusicToolAPI:
 
 # ==================== Usage Examples ====================
 
-# Define quality level list
-quality_levels = ["lossless", "exhigh", "standard"]
+# Define quality level list (in order of preference)
+QUALITY_LEVELS = ["lossless", "exhigh", "standard"]
 
 
 def random_sleep(max_delay: float = None):
@@ -194,9 +199,9 @@ def random_sleep(max_delay: float = None):
     time.sleep(delay)
 
 
-def get_song_ids_by_playlist_id(playlist_id: str) -> Dict[str, Any]:
+def get_song_ids_by_playlist_id(playlist_id: str) -> dict:
     """
-    Extract song IDs from playlist ID
+    Extract song IDs from playlist ID.
 
     Args:
         playlist_id: Playlist ID (e.g., "70512345")
@@ -292,9 +297,9 @@ def get_song_ids_by_playlist_id(playlist_id: str) -> Dict[str, Any]:
         return {"success": False, "message": f"Processing failed: {str(e)}", "playlist_id": playlist_id}
 
 
-def get_song_ids_by_album_id(album_id: str) -> Dict[str, Any]:
+def get_song_ids_by_album_id(album_id: str) -> dict:
     """
-    Extract song IDs from album ID
+    Extract song IDs from album ID.
 
     Args:
         album_id: Album ID (e.g., "361790100")
@@ -388,9 +393,9 @@ def get_song_ids_by_album_id(album_id: str) -> Dict[str, Any]:
         return {"success": False, "message": f"Processing failed: {str(e)}", "album_id": album_id}
 
 
-def get_song_metadata_by_song_id(song_id: str, level: str = None) -> Dict[str, Any]:
+def get_song_metadata_by_song_id(song_id: str, level: str | None = None) -> dict:
     """
-    Extract song information by song ID
+    Extract song information by song ID.
 
     Args:
         song_id: Song ID (e.g., "186016")
@@ -417,7 +422,7 @@ def get_song_metadata_by_song_id(song_id: str, level: str = None) -> Dict[str, A
         used_level = None
 
         # Try different quality levels
-        for qual in quality_levels:
+        for qual in QUALITY_LEVELS:
             try:
                 result_str = api.parse_song(song_id, level=qual)
 
@@ -472,9 +477,142 @@ def get_song_metadata_by_song_id(song_id: str, level: str = None) -> Dict[str, A
         return {"success": False, "message": f"Failed to get metadata: {str(e)}", "song_id": song_id}
 
 
-def write_metadata_to_file(file_path: str, metadata: Dict[str, Any]) -> bool:
+def _write_mp3_metadata(audio_file: ID3, metadata: dict) -> None:
+    """Write metadata to MP3 file."""
+    song_name = metadata.get('name', '')
+    artist = metadata.get('ar_name', '').split(',')
+    album = metadata.get('al_name', '')
+    lyric = metadata.get('lyric', '')
+    cover_path = metadata.get('cover_path', '')
+    track_number = metadata.get('track_number', '')
+    song_id = metadata.get('id', '')
+
+    # Title
+    if song_name:
+        audio_file.add(TIT2(encoding=3, text=song_name))
+
+    # Artist
+    if artist:
+        audio_file.add(TPE1(encoding=3, text=artist))
+
+    # Album
+    if album:
+        audio_file.add(TALB(encoding=3, text=album))
+
+    # Year
+    audio_file.add(TYER(encoding=3, text=str(time.localtime().tm_year)))
+
+    # Track number
+    if track_number:
+        from mutagen.id3 import TRCK
+        audio_file.add(TRCK(encoding=3, text=track_number))
+
+    # NetEase Cloud Music Song ID
+    if song_id:
+        from mutagen.id3 import TXXX
+        audio_file.add(TXXX(encoding=3, desc='CMUSIC_ID', text=song_id))
+
+    # Comments (lyrics)
+    # Note: Use encoding=1 (UTF-16 with BOM) to properly preserve newlines in lyrics
+    if lyric:
+        audio_file.add(COMM(encoding=1, lang='eng', desc='', text=lyric))
+
+    # Cover image
+    if cover_path and os.path.exists(cover_path):
+        try:
+            with open(cover_path, 'rb') as img_file:
+                img_data = img_file.read()
+                audio_file.add(APIC(
+                    encoding=3,
+                    mime=get_image_mime_type(cover_path),
+                    type=3,  # Cover (front)
+                    desc='Cover',
+                    data=img_data
+                ))
+        except Exception as e:
+            logger.warning(f"Cover image writing failed: {e}")
+
+
+def _write_flac_metadata(audio_file: FLAC, metadata: dict) -> None:
+    """Write metadata to FLAC file."""
+    song_name = metadata.get('name', '')
+    artist = metadata.get('ar_name', '').split(',')
+    album = metadata.get('al_name', '')
+    lyric = metadata.get('lyric', '')
+    cover_path = metadata.get('cover_path', '')
+    track_number = metadata.get('track_number', '')
+    song_id = metadata.get('id', '')
+
+    if song_name:
+        audio_file['TITLE'] = song_name
+    if artist:
+        audio_file['ARTIST'] = artist
+    if album:
+        audio_file['ALBUM'] = album
+    if lyric:
+        audio_file['LYRICS'] = lyric
+    if track_number:
+        audio_file['TRACKNUMBER'] = track_number
+    if song_id:
+        audio_file['CMUSIC_ID'] = song_id
+
+    # Add cover
+    if cover_path and os.path.exists(cover_path):
+        try:
+            with open(cover_path, 'rb') as img_file:
+                img_data = img_file.read()
+                picture = Picture()
+                picture.type = 3  # Cover (front)
+                picture.mime = get_image_mime_type(cover_path)
+                picture.data = img_data
+                audio_file.add_picture(picture)
+        except Exception as e:
+            logger.warning(f"Cover image writing failed: {e}")
+
+
+def _write_mp4_metadata(audio_file: MP4, metadata: dict) -> None:
+    """Write metadata to MP4/AAC file."""
+    song_name = metadata.get('name', '')
+    artist = metadata.get('ar_name', '').split(',')
+    album = metadata.get('al_name', '')
+    lyric = metadata.get('lyric', '')
+    cover_path = metadata.get('cover_path', '')
+    track_number = metadata.get('track_number', '')
+    song_id = metadata.get('id', '')
+
+    # Create metadata dictionary
+    mp4_tags = {}
+
+    if song_name:
+        mp4_tags['\xa9nam'] = song_name
+    if artist:
+        mp4_tags['\xa9ART'] = artist
+    if album:
+        mp4_tags['\xa9alb'] = album
+    if lyric:
+        mp4_tags['\xa9lyr'] = lyric[:config.get_max_lyric_length()]
+    if track_number:
+        mp4_tags['trkn'] = [(int(track_number), 0)]
+    if song_id:
+        mp4_tags['----:CMUSIC_ID'] = song_id.encode('utf-8')
+
+    # Add cover
+    if cover_path and os.path.exists(cover_path):
+        try:
+            with open(cover_path, 'rb') as img_file:
+                img_data = img_file.read()
+                mp4_tags['covr'] = [MP4Cover(img_data, imageformat=get_mp4_image_format(cover_path))]
+        except Exception as e:
+            logger.warning(f"Cover image writing failed: {e}")
+
+    if audio_file.tags is None:
+        audio_file.add_tags()
+    audio_file.tags.update(mp4_tags)
+
+
+def write_metadata_to_file(file_path: str | Path, metadata: dict) -> bool:
     """
-    Write metadata to audio file
+    Write metadata to audio file.
 
     Args:
         file_path: Audio file path
@@ -483,150 +621,73 @@ def write_metadata_to_file(file_path: str, metadata: Dict[str, Any]) -> bool:
     Returns:
         bool: Whether writing was successful
     """
+    file_path = Path(file_path)
+    ext = get_audio_extension(file_path)
+
+    logger.info(f"Writing metadata to {file_path.name}...")
+
     try:
-        # Get file extension
-        _, ext = os.path.splitext(file_path)
-        ext = ext.lower()
+        match ext:
+            case '.mp3' | '.mp2' | '.mp1':
+                audio_file = ID3(file_path)
+                _write_mp3_metadata(audio_file, metadata)
+                audio_file.save()
+            case '.flac':
+                audio_file = FLAC(file_path)
+                _write_flac_metadata(audio_file, metadata)
+                audio_file.save()
+            case '.m4a' | '.mp4' | '.aac':
+                audio_file = MP4(file_path)
+                _write_mp4_metadata(audio_file, metadata)
+                audio_file.save()
+            case _:
+                logger.warning(f"Unsupported file format: {ext}")
+                return False
 
-        song_name = metadata.get('name', '')
-        artist = metadata.get('ar_name', '').split(',')
-        album = metadata.get('al_name', '')
-        lyric = metadata.get('lyric', '')
-        cover_path = metadata.get('cover_path', '')
-        track_number = metadata.get('track_number', '')
-        song_id = metadata.get('id', '')
-
-        logger.info(f"Writing metadata to {os.path.basename(file_path)}...")
-
-        if ext in ['.mp3', '.mp2', '.mp1']:
-            # Process MP3 files
-            audio_file = ID3(file_path)
-
-            # Title
-            if song_name:
-                audio_file.add(TIT2(encoding=3, text=song_name))
-
-            # Artist
-            if artist:
-                audio_file.add(TPE1(encoding=3, text=artist))
-
-            # Album
-            if album:
-                audio_file.add(TALB(encoding=3, text=album))
-
-            # Year
-            audio_file.add(TYER(encoding=3, text=str(time.localtime().tm_year)))
-
-            # Track number
-            if track_number:
-                from mutagen.id3 import TRCK
-                audio_file.add(TRCK(encoding=3, text=track_number))
-
-            # NetEase Cloud Music Song ID
-            if song_id:
-                from mutagen.id3 import TXXX
-                audio_file.add(TXXX(encoding=3, desc='CMUSIC_ID', text=song_id))
-
-            # Comments (lyrics)
-            if lyric:
-                audio_file.add(COMM(encoding=3, lang='eng', desc='', text=lyric))  # Limit length
-
-            # Cover image
-            if cover_path and os.path.exists(cover_path):
-                try:
-                    with open(cover_path, 'rb') as img_file:
-                        img_data = img_file.read()
-                        audio_file.add(APIC(
-                            encoding=3,
-                            mime='image/jpeg',
-                            type=3,  # Cover (front)
-                            desc='Cover',
-                            data=img_data
-                        ))
-                except Exception as e:
-                    logger.warning(f"Cover image writing failed: {str(e)}")
-
-            audio_file.save()
-
-        elif ext == '.flac':
-            # Process FLAC files
-            audio_file = FLAC(file_path)
-
-            if song_name:
-                audio_file['TITLE'] = song_name
-            if artist:
-                audio_file['ARTIST'] = artist
-            if album:
-                audio_file['ALBUM'] = album
-            if lyric:
-                audio_file['LYRICS'] = lyric
-            if track_number:
-                audio_file['TRACKNUMBER'] = track_number
-            if song_id:
-                audio_file['CMUSIC_ID'] = song_id
-
-            # Add cover
-            if cover_path and os.path.exists(cover_path):
-                try:
-                    with open(cover_path, 'rb') as img_file:
-                        img_data = img_file.read()
-                        picture = Picture()
-                        picture.type = 3  # Cover (front)
-                        picture.mime = 'image/jpeg'
-                        picture.data = img_data
-                        audio_file.add_picture(picture)
-                except Exception as e:
-                    logger.warning(f"Cover image writing failed: {str(e)}")
-
-            audio_file.save()
-
-        elif ext in ['.m4a', '.mp4', '.aac']:
-            # Process MP4/AAC files
-            audio_file = MP4(file_path)
-
-            # Create metadata dictionary
-            mp4_tags = {}
-
-            if song_name:
-                mp4_tags['\xa9nam'] = song_name  # Title
-            if artist:
-                mp4_tags['\xa9ART'] = artist  # Artist
-            if album:
-                mp4_tags['\xa9alb'] = album  # Album
-            if lyric:
-                mp4_tags['\xa9lyr'] = lyric[:1000]  # Lyrics
-            if track_number:
-                mp4_tags['trkn'] = [(int(track_number), 0)]  # Track number for MP4
-            if song_id:
-                mp4_tags['----:CMUSIC_ID'] = song_id.encode('utf-8')  # Music Song ID
-
-            # Add cover
-            if cover_path and os.path.exists(cover_path):
-                try:
-                    with open(cover_path, 'rb') as img_file:
-                        img_data = img_file.read()
-                        mp4_tags['covr'] = [MP4Cover(img_data, imageformat=MP4Cover.FORMAT_JPEG)]
-                except Exception as e:
-                    logger.warning(f"Cover image writing failed: {str(e)}")
-
-            audio_file.tags.update(mp4_tags)
-            audio_file.save()
-
-        else:
-            logger.warning(f"Unsupported file format: {ext}")
-            return False
-
-        logger.info(f"Metadata written successfully!")
+        logger.info("Metadata written successfully!")
         return True
 
     except Exception as e:
-        logger.error(f"Metadata writing failed: {str(e)}")
+        logger.error(f"Metadata writing failed: {e}")
         return False
 
 
-def write_picture_to_file(file_path: str) -> bool:
+def _write_mp3_cover(audio_file: ID3, cover_path: str | Path) -> None:
+    """Write cover image to MP3 file."""
+    with open(cover_path, 'rb') as img_file:
+        img_data = img_file.read()
+        audio_file.add(APIC(
+            encoding=3,
+            mime=get_image_mime_type(cover_path),
+            type=3,  # Cover (front)
+            desc='Cover',
+            data=img_data
+        ))
+
+
+def _write_flac_cover(audio_file: FLAC, cover_path: str | Path) -> None:
+    """Write cover image to FLAC file."""
+    with open(cover_path, 'rb') as img_file:
+        img_data = img_file.read()
+        picture = Picture()
+        picture.type = 3  # Cover (front)
+        picture.mime = get_image_mime_type(cover_path)
+        picture.data = img_data
+        audio_file.add_picture(picture)
+
+
+def _write_mp4_cover(audio_file: MP4, cover_path: str | Path) -> None:
+    """Write cover image to MP4/AAC file."""
+    with open(cover_path, 'rb') as img_file:
+        img_data = img_file.read()
+        if audio_file.tags is None:
+            audio_file.add_tags()
+        audio_file.tags['covr'] = [MP4Cover(img_data, imageformat=get_mp4_image_format(cover_path))]
+
+
+def write_picture_to_file(file_path: str | Path) -> bool:
     """
-    Write image file in the same directory to audio file
+    Write image file in the same directory to audio file.
 
     Args:
         file_path: Audio file path
@@ -634,147 +695,124 @@ def write_picture_to_file(file_path: str) -> bool:
     Returns:
         bool: Whether writing was successful
     """
+    file_path = Path(file_path)
+    file_dir = file_path.parent
+    file_base_name = file_path.stem
+
+    # Look for image files with the same name
+    cover_path = None
+    for ext in ['.jpg', '.jpeg', '.png', '.bmp', '.gif']:
+        potential_cover = file_dir / f"{file_base_name}{ext}"
+        if potential_cover.exists():
+            cover_path = potential_cover
+            logger.info(f"Found cover image: {cover_path.name}")
+            break
+
+    if not cover_path:
+        logger.warning("No image file found with the same name")
+        return False
+
+    ext = get_audio_extension(file_path)
+    logger.info(f"Writing image to {file_path.name}...")
+
     try:
-        # Get directory and base filename (without extension) of the file
-        file_dir = os.path.dirname(file_path)
-        file_base_name = os.path.splitext(os.path.basename(file_path))[0]
-
-        # Supported image formats
-        image_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.gif']
-        cover_path = None
-
-        # Look for image files with the same name in the same directory
-        for ext in image_extensions:
-            potential_cover = os.path.join(file_dir, file_base_name + ext)
-            if os.path.exists(potential_cover):
-                cover_path = potential_cover
-                logger.info(f"Found cover image: {os.path.basename(cover_path)}")
-                break
-
-        if not cover_path:
-            logger.warning(f"No image file found with the same name")
-            return False
-
-        # Get file extension
-        _, ext = os.path.splitext(file_path)
-        ext = ext.lower()
-
-        logger.info(f"Writing image to {os.path.basename(file_path)}...")
-
-        if ext in ['.mp3', '.mp2', '.mp1']:
-            # Process MP3 files
-            try:
+        match ext:
+            case '.mp3' | '.mp2' | '.mp1':
                 audio_file = ID3(file_path)
-
-                # Read image file
-                with open(cover_path, 'rb') as img_file:
-                    img_data = img_file.read()
-
-                    # Determine image MIME type
-                    mime_type = 'image/jpeg'
-                    if cover_path.lower().endswith('.png'):
-                        mime_type = 'image/png'
-                    elif cover_path.lower().endswith('.bmp'):
-                        mime_type = 'image/bmp'
-                    elif cover_path.lower().endswith('.gif'):
-                        mime_type = 'image/gif'
-
-                    # Add cover image
-                    audio_file.add(APIC(
-                        encoding=3,
-                        mime=mime_type,
-                        type=3,  # Cover (front)
-                        desc='Cover',
-                        data=img_data
-                    ))
-
+                _write_mp3_cover(audio_file, cover_path)
                 audio_file.save()
-                logger.info(f"MP3 cover image written successfully!")
-                return True
-
-            except Exception as e:
-                logger.error(f"MP3 cover image writing failed: {str(e)}")
-                return False
-
-        elif ext == '.flac':
-            # Process FLAC files
-            try:
+                logger.info("MP3 cover image written successfully!")
+            case '.flac':
                 audio_file = FLAC(file_path)
-
-                # Read image file
-                with open(cover_path, 'rb') as img_file:
-                    img_data = img_file.read()
-
-                    # Create Picture object
-                    picture = Picture()
-                    picture.type = 3  # Cover (front)
-
-                    # Determine image MIME type
-                    if cover_path.lower().endswith('.png'):
-                        picture.mime = 'image/png'
-                    elif cover_path.lower().endswith('.bmp'):
-                        picture.mime = 'image/bmp'
-                    elif cover_path.lower().endswith('.gif'):
-                        picture.mime = 'image/gif'
-                    else:
-                        picture.mime = 'image/jpeg'
-
-                    picture.data = img_data
-                    audio_file.add_picture(picture)
-
+                _write_flac_cover(audio_file, cover_path)
                 audio_file.save()
-                logger.info(f"FLAC cover image written successfully!")
-                return True
-
-            except Exception as e:
-                logger.error(f"FLAC cover image writing failed: {str(e)}")
-                return False
-
-        elif ext in ['.m4a', '.mp4', '.aac']:
-            # Process MP4/AAC files
-            try:
+                logger.info("FLAC cover image written successfully!")
+            case '.m4a' | '.mp4' | '.aac':
                 audio_file = MP4(file_path)
-
-                # Read image file
-                with open(cover_path, 'rb') as img_file:
-                    img_data = img_file.read()
-
-                    # Determine image format
-                    image_format = MP4Cover.FORMAT_JPEG
-                    if cover_path.lower().endswith('.png'):
-                        image_format = MP4Cover.FORMAT_PNG
-
-                    # Update tags
-                    if audio_file.tags is None:
-                        audio_file.add_tags()
-
-                    audio_file.tags['covr'] = [MP4Cover(img_data, imageformat=image_format)]
-
+                _write_mp4_cover(audio_file, cover_path)
                 audio_file.save()
-                logger.info(f"MP4/AAC cover image written successfully!")
-                return True
-
-            except Exception as e:
-                logger.error(f"MP4/AAC cover image writing failed: {str(e)}")
+                logger.info("MP4/AAC cover image written successfully!")
+            case _:
+                logger.warning(f"Unsupported file format: {ext}")
                 return False
-
-        else:
-            logger.warning(f"Unsupported file format: {ext}")
-            return False
+        return True
 
     except Exception as e:
-        logger.error(f"Error occurred while writing image: {str(e)}")
+        logger.error(f"Cover image writing failed: {e}")
         return False
 
 
-def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str = None,
-                                idx: int = None) -> bool:
+def _extract_file_extension(download_url: str) -> str:
+    """Extract file extension from download URL."""
+    file_extension = ".mp3"  # Default extension
+
+    parsed_url = urllib.parse.urlparse(download_url)
+    path_parts = parsed_url.path.split('/')
+
+    if path_parts:
+        last_part = path_parts[-1]
+        if '.' in last_part:
+            file_extension = Path(last_part).suffix.lower()
+
+    # Try to extract from query parameters
+    if file_extension == ".mp3":
+        query_params = urllib.parse.parse_qs(parsed_url.query)
+        v_param = query_params.get('v', [''])[0]
+        if v_param and '.' in v_param:
+            ext_from_v = Path(v_param).suffix.lower()
+            if ext_from_v in {'.flac', '.wav', '.aac', '.m4a'}:
+                file_extension = ext_from_v
+
+    return file_extension
+
+
+def _build_filename(song_name: str, artist: str, idx: int | None) -> str:
+    """Build filename with optional index."""
+    safe_song_name = clean_filename(song_name)
+    safe_artist = clean_filename(artist)
+
+    add_index = config.should_add_index()
+    index_format = config.get_index_format()
+
+    if idx is not None and add_index:
+        formatted_index = f"{idx:{index_format}}"
+        filename = f"{formatted_index} - {safe_artist} - {safe_song_name}"
+    else:
+        filename = f"{safe_artist} - {safe_song_name}"
+
+    # Truncate if too long
+    max_filename_length = 200
+    if len(filename) > max_filename_length:
+        logger.warning(f"Filename too long ({len(filename)} chars), truncating")
+        if idx is not None and add_index:
+            formatted_index = f"{idx:{index_format}}"
+            available_length = max_filename_length - len(formatted_index) - 4
+            total_original = len(safe_artist) + len(safe_song_name)
+            if total_original > 0:
+                artist_ratio = len(safe_artist) / total_original
+                max_artist_len = int(available_length * artist_ratio * 0.5)
+                max_song_len = available_length - max_artist_len - 3
+                safe_artist = safe_artist[:max_artist_len]
+                safe_song_name = safe_song_name[:max_song_len]
+            filename = f"{formatted_index} - {safe_artist} - {safe_song_name}"
+        else:
+            filename = filename[:max_filename_length]
+
+    return filename
+
+
+def download_song_and_resources(
+    song_metadata: dict,
+    download_dir: str | None = None,
+    idx: int | None = None
+) -> bool:
     """
-    Download song file and related resources (lyrics, cover)
+    Download song file and related resources (lyrics, cover).
 
     Args:
         song_metadata: Song metadata dictionary
         download_dir: Download directory path
+        idx: Track index for filename
 
     Returns:
         bool: Whether download was successful
@@ -783,205 +821,116 @@ def download_song_and_resources(song_metadata: Dict[str, Any], download_dir: str
         logger.error("Invalid song metadata")
         return False
 
+    data = song_metadata['data']
+    download_url = data['url']
+
+    if not download_url:
+        logger.error("No download URL in metadata")
+        return False
+
+    # Setup paths
+    download_dir = download_dir or config.get_download_dir()
+    Path(download_dir).mkdir(parents=True, exist_ok=True)
+
+    # Build filename
+    filename = _build_filename(data['name'], data['ar_name'], idx)
+    file_extension = _extract_file_extension(download_url)
+
+    music_file_path = Path(download_dir) / f"{filename}{file_extension}"
+    lyric_file_path = Path(download_dir) / f"{filename}.lrc"
+    cover_file_path = Path(download_dir) / f"{filename}.jpg"
+
+    logger.info(f"Detected file format: {file_extension}")
+
+    # Skip if already exists
+    if music_file_path.exists():
+        logger.info(f"File already exists, skipping: {music_file_path.name}")
+        return True
+
+    logger.info(f"Starting download: {filename}")
+    logger.info(f"File size: {data.get('size', 'Unknown')}")
+    logger.info(f"Quality: {song_metadata.get('used_quality', data.get('level', 'unknown'))}")
+    logger.info("-" * 60)
+
+    # Download music file
+    logger.info("Downloading music file...")
+    random_sleep()
     try:
-        data = song_metadata['data']
-        song_name = data['name']
-        artist = data['ar_name']
-        album = data['al_name']
-        download_url = data['url']
-        lyric = data.get('lyric', '')
-        cover_url = data.get('pic', '')
-        file_size = data.get('size', '')
-        quality = song_metadata.get('used_quality', data.get('level', 'unknown'))
+        response = requests.get(download_url, stream=True, timeout=config.get_timeout())
+        response.raise_for_status()
+        with open(music_file_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+        logger.info(f"Music file downloaded: {music_file_path.name}")
+    except requests.RequestException as e:
+        logger.error(f"Music file download failed: {e}")
+        return False
 
-        # Use default download directory from config if not specified
-        if download_dir is None:
-            download_dir = config.get_download_dir()
+    # Prepare metadata for tagging
+    metadata_for_tagging = data.copy()
+    metadata_for_tagging['cover_path'] = str(cover_file_path) if cover_file_path.exists() else ''
+    if idx is not None:
+        metadata_for_tagging['track_number'] = str(idx)
 
-        # Get configuration values
-        add_index = config.should_add_index()
-        index_format = config.get_index_format()
-        illegal_char_replacement = config.get_illegal_char_replacement()
-        max_lyric_length = config.get_max_lyric_length()
-        timeout = config.get_timeout()
-
-        # Create download directory
-        os.makedirs(download_dir, exist_ok=True)
-
-        # Clean illegal characters from filename
-        safe_song_name = re.sub(r'[<>:"/\\|?*]', illegal_char_replacement, song_name)
-        safe_artist = re.sub(r'[<>:"/\\|?*]', illegal_char_replacement, artist)
-
-        # Extract file extension from download URL
-        file_extension = ".mp3"  # Default extension
-        if download_url:
-            # Parse URL to get filename
-            parsed_url = urllib.parse.urlparse(download_url)
-            # Extract file extension from path
-            path_parts = parsed_url.path.split('/')
-            if path_parts:
-                last_part = path_parts[-1]
-                if '.' in last_part:
-                    file_extension = os.path.splitext(last_part)[1].lower()
-            # If URL parameters contain file information, also try to extract
-            if not file_extension or file_extension == ".mp3":
-                query_params = urllib.parse.parse_qs(parsed_url.query)
-                if 'v' in query_params and query_params['v'][0]:
-                    v_param = query_params['v'][0]
-                    if '.' in v_param:
-                        ext_from_v = os.path.splitext(v_param)[1].lower()
-                        if ext_from_v in ['.flac', '.wav', '.aac', '.m4a']:
-                            file_extension = ext_from_v
-
-        # Construct filename
-        if idx is not None and add_index:
-            # If index is provided, format as configured number format
-            formatted_index = f"{idx:{index_format}}"
-            filename = f"{formatted_index} - {safe_artist} - {safe_song_name}"
-        elif add_index:
-            # If no specific index but should add index, use generic numbering
-            filename = f"{safe_artist} - {safe_song_name}"
+    # Write metadata
+    logger.info("\nWriting metadata...")
+    if config.should_write_metadata():
+        if write_metadata_to_file(music_file_path, metadata_for_tagging):
+            logger.info(f"Metadata attached: {music_file_path.name}")
         else:
-            filename = f"{safe_artist} - {safe_song_name}"
-        
-        # Check and truncate filename if too long (Windows MAX_PATH = 260 characters)
-        # Reserve some space for download directory and safety margin
-        max_filename_length = 200  # Conservative limit to avoid path length issues
-        if len(filename) > max_filename_length:
-            logger.warning(f"Filename too long ({len(filename)} chars), truncating to {max_filename_length} chars")
-            # Keep the index prefix if present, truncate the rest
-            if idx is not None and add_index:
-                # Preserve index part and truncate artist and title
-                formatted_index = f"{idx:{index_format}}"
-                # Calculate available space for artist and title
-                available_length = max_filename_length - len(formatted_index) - 4  # 4 for " - "
-                # Truncate artist and title proportionally
-                total_original = len(safe_artist) + len(safe_song_name)
-                if total_original > 0:
-                    artist_ratio = len(safe_artist) / total_original
-                    max_artist_len = int(available_length * artist_ratio * 0.5)  # 50% for artist
-                    max_song_len = available_length - max_artist_len - 3  # 3 for " - "
-                    safe_artist = safe_artist[:max_artist_len]
-                    safe_song_name = safe_song_name[:max_song_len]
-                filename = f"{formatted_index} - {safe_artist} - {safe_song_name}"
-            else:
-                filename = filename[:max_filename_length]
-            logger.info(f"Truncated filename: {filename}")
-        
-        music_file_path = os.path.join(download_dir, f"{filename}{file_extension}")
-        lyric_file_path = os.path.join(download_dir, f"{filename}.lrc")
-        cover_file_path = os.path.join(download_dir, f"{filename}.jpg")
-
-        logger.info(f"Detected file format: {file_extension}")
-
-        # Check if a file with the same name already exists, if so skip download
-        if os.path.exists(music_file_path):
-            logger.info(f"File already exists, skipping download: {os.path.basename(music_file_path)}")
-            logger.info(f"File path: {music_file_path}")
-            return True
-
-        logger.info(f"Starting download: {filename}")
-        logger.info(f"File size: {file_size}")
-        logger.info(f"Quality: {quality}")
-        logger.info("-" * 60)
-
-        # Download music file
-        logger.info("Downloading music file...")
-        random_sleep()
-        try:
-            response = requests.get(download_url, stream=True, timeout=timeout)
-            response.raise_for_status()
-
-            with open(music_file_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-
-                logger.info(f"Music file downloaded: {os.path.basename(music_file_path)}")
-        except Exception as e:
-            logger.error(f"Music file download failed: {str(e)}")
-            return False
-
-        # Pass cover path and track number to metadata
-        metadata_for_tagging = data.copy()
-        if os.path.exists(cover_file_path):
-            metadata_for_tagging['cover_path'] = cover_file_path
-        else:
-            metadata_for_tagging['cover_path'] = ''
-
-        # Add track number information
-        if idx is not None:
-            metadata_for_tagging['track_number'] = str(idx)
-
-        # Write metadata to audio file
-        logger.info("\nWriting metadata...")
-        if config.should_write_metadata() and write_metadata_to_file(music_file_path, metadata_for_tagging):
-            logger.info(f"Metadata successfully attached to: {os.path.basename(music_file_path)}")
-        else:
-            logger.warning(f"Metadata writing failed, but file has been downloaded normally")
-
-            # Retry, until success
-            retry_count = 0
-            while True:
-                logger.info(f"[{retry_count}] re-try to write metadata...")
-                retry_count += 1
+            logger.warning("Metadata writing failed, retrying...")
+            for retry_count in range(3):
+                logger.info(f"Retry {retry_count + 1}/3...")
                 if write_metadata_to_file(music_file_path, metadata_for_tagging):
                     break
 
-        # Download lyrics
-        if lyric and config.should_write_lyrics():
-            logger.info("Saving lyrics...")
-            try:
-                with open(lyric_file_path, 'w', encoding='utf-8') as f:
-                    f.write(lyric)
-                logger.info(f"Lyrics saved: {os.path.basename(lyric_file_path)}")
-            except Exception as e:
-                logger.warning(f"Lyrics saving failed: {str(e)}")
-        else:
-            logger.warning("No lyrics found")
+    # Download lyrics
+    lyric = data.get('lyric', '')
+    if lyric and config.should_write_lyrics():
+        logger.info("Saving lyrics...")
+        try:
+            with open(lyric_file_path, 'w', encoding='utf-8') as f:
+                f.write(lyric)
+            logger.info(f"Lyrics saved: {lyric_file_path.name}")
+        except IOError as e:
+            logger.warning(f"Lyrics saving failed: {e}")
+    else:
+        logger.warning("No lyrics found")
 
-        # Download cover
-        if cover_url and config.should_write_cover():
-            logger.info("Downloading cover...")
-            random_sleep()
-            try:
-                cover_response = requests.get(cover_url + '?param=320x320', timeout=10)
-                cover_response.raise_for_status()
+    # Download cover
+    cover_url = data.get('pic', '')
+    if cover_url and config.should_write_cover():
+        logger.info("Downloading cover...")
+        random_sleep()
+        try:
+            cover_response = requests.get(f"{cover_url}?param=320x320", timeout=10)
+            cover_response.raise_for_status()
+            with open(cover_file_path, 'wb') as f:
+                f.write(cover_response.content)
+            logger.info(f"Cover downloaded: {cover_file_path.name}")
+        except requests.RequestException as e:
+            logger.warning(f"Cover download failed: {e}")
+    else:
+        logger.warning("No cover found")
 
-                with open(cover_file_path, 'wb') as f:
-                    f.write(cover_response.content)
-                logger.info(f"Cover downloaded: {os.path.basename(cover_file_path)}")
-            except Exception as e:
-                logger.warning(f"Cover download failed: {str(e)}")
-        else:
-            logger.warning("No cover found")
-
+    # Embed cover
+    if config.should_write_cover():
         logger.info("Adding cover to song file...")
-        if config.should_write_cover():
-            write_picture_to_file(music_file_path)
-            logger.info("Cover has been added to the song file")
-        else:
-            logger.info("Skipping cover embedding (disabled in config)")
+        write_picture_to_file(music_file_path)
 
-        logger.info(f"\nDownload completed! Files saved in: {download_dir}")
-        return True
-
-    except KeyError as e:
-        logger.error(f"Metadata missing required field: {str(e)}")
-        return False
-    except Exception as e:
-        logger.error(f"Error occurred during download: {str(e)}")
-        return False
+    logger.info(f"\nDownload completed! Files saved in: {download_dir}")
+    return True
 
 
-def download_song(song_id: str, level: str = None):
+def download_song(song_id: str, level: str | None = None):
     if level is None:
         level = config.get_default_quality()
     metadata = get_song_metadata_by_song_id(song_id, level)
     download_song_and_resources(metadata, idx=None)
 
 
-def prepare_album_folder(album_metadata: Dict[str, Any], download_dir: str = None) -> str:
+def prepare_album_folder(album_metadata: dict, download_dir: str | None = None) -> str | None:
     """
     Create album folder with description file and cover image
 
@@ -1028,9 +977,8 @@ def prepare_album_folder(album_metadata: Dict[str, Any], download_dir: str = Non
             logger.warning(f"Could not extract album cover URL")
 
         # Clean illegal characters from folder name
-        illegal_char_replacement = config.get_illegal_char_replacement()
-        safe_album_name = re.sub(r'[<>:"/\\|?*]', illegal_char_replacement, album_name)
-        safe_artist = re.sub(r'[<>:"/\\|?*]', illegal_char_replacement, album_artist)
+        safe_album_name = clean_filename(album_name)
+        safe_artist = clean_filename(album_artist)
 
         # Create album folder name: Artist - Album Name (yyyy-MM-dd)
         if publish_date_str:
@@ -1085,7 +1033,7 @@ def prepare_album_folder(album_metadata: Dict[str, Any], download_dir: str = Non
         return None
 
 
-def download_album(album_id: str, index_ids: list, level: str = None):
+def download_album(album_id: str, index_ids: list, level: str | None = None):
     if level is None:
         level = config.get_default_quality()
     album_metadata = get_song_ids_by_album_id(album_id)
@@ -1116,7 +1064,7 @@ def download_album(album_id: str, index_ids: list, level: str = None):
     logger.info(f"Completed downloading album: {album_artist} - {album_name}")
 
 
-def download_playlist(playlist_id: str, index_ids: list, level: str = None):
+def download_playlist(playlist_id: str, index_ids: list, level: str | None = None):
     if level is None:
         level = config.get_default_quality()
     playlist_metadata = get_song_ids_by_playlist_id(playlist_id)

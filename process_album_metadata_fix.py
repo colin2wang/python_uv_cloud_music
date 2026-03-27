@@ -1,15 +1,18 @@
 import json
 import os
-import re
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Optional
 
 from mutagen.flac import FLAC, Picture
-from mutagen.id3 import ID3, TIT2, TPE1, TALB, APIC, COMM, TYER, TRCK
+from mutagen.id3 import ID3, TIT2, TPE1, TALB, APIC, TYER, TRCK
 from mutagen.mp4 import MP4, MP4Cover
 
 from logging_config import setup_logger
 from config_manager import config
+from utils import (
+    get_audio_extension, get_image_mime_type, get_mp4_image_format,
+    parse_music_filename, find_cover_image
+)
 
 # Create logger
 logger = setup_logger(__name__)
@@ -81,90 +84,49 @@ class AlbumMetadataFixer:
     
     def find_cover_image(self) -> Optional[Path]:
         """
-        Find cover image in the album folder
-        
+        Find cover image in the album folder.
+
         Returns:
             Path to cover image or None
         """
-        cover_extensions = ['.jpg', '.jpeg', '.png', '.bmp']
-        
-        # Look for cover.jpg first
-        for ext in cover_extensions:
-            cover_path = self.album_folder / f'cover{ext}'
-            if cover_path.exists():
-                logger.info(f"Found cover image: {cover_path.name}")
-                self.cover_path = cover_path
-                return cover_path
-        
-        # Look for any image file
-        for ext in cover_extensions:
-            for img_file in self.album_folder.glob(f'*{ext}'):
-                if img_file.name.lower() != 'cover.jpg':
-                    logger.info(f"Found potential cover image: {img_file.name}")
-                    self.cover_path = img_file
-                    return img_file
-        
-        logger.warning("No cover image found")
-        return None
+        cover_path = find_cover_image(self.album_folder)
+        if cover_path:
+            logger.info(f"Found cover image: {cover_path.name}")
+            self.cover_path = cover_path
+        else:
+            logger.warning("No cover image found")
+        return cover_path
     
-    def parse_filename(self, filename: str) -> Dict[str, str]:
+    def parse_filename(self, filename: str) -> dict:
         """
-        Parse music file filename to extract metadata
-        
+        Parse music file filename to extract metadata.
+
         Expected format: {index} - {artist} - {title} or {artist} - {title}
-        
+
         Args:
             filename: Filename without extension
-            
+
         Returns:
             Dictionary with parsed metadata
         """
-        result = {
-            'track_number': '',
-            'artist': '',
-            'title': ''
-        }
-        
-        # Remove common prefixes
-        clean_filename = filename.strip()
-        
-        # Try to match pattern: index - artist - title
-        pattern_with_index = r'^(\d+)\s*-\s*(.+?)\s*-\s*(.+)$'
-        match = re.match(pattern_with_index, clean_filename)
-        
-        if match:
-            result['track_number'] = match.group(1).strip()
-            result['artist'] = match.group(2).strip()
-            result['title'] = match.group(3).strip()
-            logger.debug(f"Parsed (with index): {result}")
-            return result
-        
-        # Try to match pattern: artist - title
-        pattern_without_index = r'^(.+?)\s*-\s*(.+)$'
-        match = re.match(pattern_without_index, clean_filename)
-        
-        if match:
-            result['artist'] = match.group(1).strip()
-            result['title'] = match.group(2).strip()
-            logger.debug(f"Parsed (without index): {result}")
-            return result
-        
-        # If no pattern matches, use the whole filename as title
-        result['title'] = clean_filename
-        logger.warning(f"Could not parse filename, using as title: {filename}")
+        result = parse_music_filename(filename)
+        if not result['artist']:
+            logger.warning(f"Could not parse filename, using as title: {filename}")
+        else:
+            logger.debug(f"Parsed filename: {result}")
         return result
     
-    def check_metadata_status(self, file_path: Path) -> Dict[str, Any]:
+    def check_metadata_status(self, file_path: Path) -> dict:
         """
-        Check current metadata status of a music file
-        
+        Check current metadata status of a music file.
+
         Args:
             file_path: Path to music file
-            
+
         Returns:
             Dictionary with metadata status
         """
-        ext = file_path.suffix.lower()
+        ext = get_audio_extension(file_path)
         status = {
             'has_title': False,
             'has_artist': False,
@@ -209,20 +171,20 @@ class AlbumMetadataFixer:
         
         return status
     
-    def fix_metadata(self, file_path: Path, parsed_info: Dict[str, str], 
+    def fix_metadata(self, file_path: Path, parsed_info: dict,
                     track_number: Optional[str] = None) -> bool:
         """
-        Fix metadata for a music file
-        
+        Fix metadata for a music file.
+
         Args:
             file_path: Path to music file
             parsed_info: Parsed information from filename
             track_number: Track number (optional, overrides parsed_info)
-            
+
         Returns:
             bool: Whether metadata was fixed successfully
         """
-        ext = file_path.suffix.lower()
+        ext = get_audio_extension(file_path)
         
         # Use provided track number or parsed one
         final_track_number = track_number or parsed_info.get('track_number', '')
@@ -253,12 +215,12 @@ class AlbumMetadataFixer:
             logger.error(f"Failed to fix metadata: {str(e)}")
             return False
     
-    def _fix_mp3_metadata(self, file_path: Path, title: str, artist: str, 
+    def _fix_mp3_metadata(self, file_path: Path, title: str, artist: str,
                          album: str, track_number: str) -> bool:
-        """Fix MP3 file metadata"""
+        """Fix MP3 file metadata."""
         try:
             audio = ID3(file_path)
-            
+
             # Add or update tags
             if title:
                 audio.add(TIT2(encoding=3, text=title))
@@ -268,48 +230,46 @@ class AlbumMetadataFixer:
                 audio.add(TALB(encoding=3, text=album))
             if track_number:
                 audio.add(TRCK(encoding=3, text=track_number))
-            
+
             # Add year
-            audio.add(TYER(encoding=3, text=str(self.album_info.get('publish_date', '')[:4] or '2024')))
-            
+            publish_date = self.album_info.get('publish_date', '')
+            year = publish_date[:4] if publish_date else '2024'
+            audio.add(TYER(encoding=3, text=year))
+
             # Add cover if available
             if self.cover_path and self.cover_path.exists():
                 try:
                     with open(self.cover_path, 'rb') as img_file:
                         img_data = img_file.read()
-                        mime_type = 'image/jpeg'
-                        if self.cover_path.suffix.lower() == '.png':
-                            mime_type = 'image/png'
-                        
                         # Remove existing cover
                         apic_tags = [key for key in audio.keys() if key.startswith('APIC')]
                         for tag in apic_tags:
                             del audio[tag]
-                        
+
                         audio.add(APIC(
                             encoding=3,
-                            mime=mime_type,
+                            mime=get_image_mime_type(self.cover_path),
                             type=3,
                             desc='Cover',
                             data=img_data
                         ))
                 except Exception as e:
-                    logger.warning(f"Failed to add cover: {str(e)}")
-            
+                    logger.warning(f"Failed to add cover: {e}")
+
             audio.save()
             logger.info("MP3 metadata fixed successfully")
             return True
-            
+
         except Exception as e:
-            logger.error(f"MP3 metadata fix failed: {str(e)}")
+            logger.error(f"MP3 metadata fix failed: {e}")
             return False
     
     def _fix_flac_metadata(self, file_path: Path, title: str, artist: str,
                           album: str, track_number: str) -> bool:
-        """Fix FLAC file metadata"""
+        """Fix FLAC file metadata."""
         try:
             audio = FLAC(file_path)
-            
+
             # Add or update tags
             if title:
                 audio['TITLE'] = title
@@ -319,12 +279,12 @@ class AlbumMetadataFixer:
                 audio['ALBUM'] = album
             if track_number:
                 audio['TRACKNUMBER'] = track_number
-            
+
             # Add publish date
             publish_date = self.album_info.get('publish_date', '')
             if publish_date:
                 audio['DATE'] = publish_date[:4]
-            
+
             # Add cover if available
             if self.cover_path and self.cover_path.exists():
                 try:
@@ -332,35 +292,32 @@ class AlbumMetadataFixer:
                         img_data = img_file.read()
                         picture = Picture()
                         picture.type = 3  # Cover (front)
-                        picture.mime = 'image/jpeg'
-                        if self.cover_path.suffix.lower() == '.png':
-                            picture.mime = 'image/png'
+                        picture.mime = get_image_mime_type(self.cover_path)
                         picture.data = img_data
-                        
+
                         # Remove existing pictures
                         audio.clear_pictures()
-                        
                         audio.add_picture(picture)
                 except Exception as e:
-                    logger.warning(f"Failed to add cover: {str(e)}")
-            
+                    logger.warning(f"Failed to add cover: {e}")
+
             audio.save()
             logger.info("FLAC metadata fixed successfully")
             return True
-            
+
         except Exception as e:
-            logger.error(f"FLAC metadata fix failed: {str(e)}")
+            logger.error(f"FLAC metadata fix failed: {e}")
             return False
     
     def _fix_mp4_metadata(self, file_path: Path, title: str, artist: str,
                          album: str, track_number: str) -> bool:
-        """Fix MP4/AAC file metadata"""
+        """Fix MP4/AAC file metadata."""
         try:
             audio = MP4(file_path)
-            
+
             # Create metadata dictionary
             mp4_tags = {}
-            
+
             if title:
                 mp4_tags['\xa9nam'] = title
             if artist:
@@ -372,40 +329,36 @@ class AlbumMetadataFixer:
                     mp4_tags['trkn'] = [(int(track_number), 0)]
                 except ValueError:
                     pass
-            
+
             # Add cover if available
             if self.cover_path and self.cover_path.exists():
                 try:
                     with open(self.cover_path, 'rb') as img_file:
                         img_data = img_file.read()
-                        image_format = MP4Cover.FORMAT_JPEG
-                        if self.cover_path.suffix.lower() == '.png':
-                            image_format = MP4Cover.FORMAT_PNG
-                        
-                        mp4_tags['covr'] = [MP4Cover(img_data, imageformat=image_format)]
+                        mp4_tags['covr'] = [MP4Cover(img_data, imageformat=get_mp4_image_format(self.cover_path))]
                 except Exception as e:
-                    logger.warning(f"Failed to add cover: {str(e)}")
-            
+                    logger.warning(f"Failed to add cover: {e}")
+
             if audio.tags is None:
                 audio.add_tags()
-            
+
             audio.tags.update(mp4_tags)
             audio.save()
             logger.info("MP4/AAC metadata fixed successfully")
             return True
-            
+
         except Exception as e:
-            logger.error(f"MP4/AAC metadata fix failed: {str(e)}")
+            logger.error(f"MP4/AAC metadata fix failed: {e}")
             return False
     
-    def scan_and_fix(self, fix_only_missing: bool = True) -> Dict[str, Any]:
+    def scan_and_fix(self, fix_only_missing: bool = True) -> dict:
         """
-        Scan album folder and fix metadata for all music files
-        
+        Scan album folder and fix metadata for all music files.
+
         Args:
             fix_only_missing: If True, only fix files with missing metadata.
                             If False, fix all files.
-        
+
         Returns:
             Dictionary with scan results
         """
@@ -530,14 +483,14 @@ class AlbumMetadataFixer:
         return results
 
 
-def fix_album_metadata(album_folder: str, fix_only_missing: bool = True) -> Dict[str, Any]:
+def fix_album_metadata(album_folder: str, fix_only_missing: bool = True) -> dict:
     """
-    Convenience function to fix album metadata
-    
+    Convenience function to fix album metadata.
+
     Args:
         album_folder: Path to album folder
         fix_only_missing: If True, only fix files with missing metadata
-        
+
     Returns:
         Dictionary with fix results
     """
@@ -545,14 +498,14 @@ def fix_album_metadata(album_folder: str, fix_only_missing: bool = True) -> Dict
     return fixer.scan_and_fix(fix_only_missing)
 
 
-def scan_multiple_albums(album_folders: List[str], fix_only_missing: bool = True) -> List[Dict[str, Any]]:
+def scan_multiple_albums(album_folders: list[str], fix_only_missing: bool = True) -> list[dict]:
     """
-    Scan and fix multiple album folders
-    
+    Scan and fix multiple album folders.
+
     Args:
         album_folders: List of album folder paths
         fix_only_missing: If True, only fix files with missing metadata
-        
+
     Returns:
         List of results for each album
     """
@@ -573,7 +526,7 @@ if __name__ == "__main__":
     # Example usage
     
     # Example 1: Fix single album folder
-    fix_album_metadata(r"J:\我的音乐\我的专辑\动漫原声\鷺巣詩郎 - NEON GENESIS EVANGELION SOUNDTRACK 25th ANNIVERSARY BOX (2020-10-07)")
+    fix_album_metadata(r"F:\Workspaces\JetBrains\PyCharm\python_uv_cloud_music\downloads\许茹芸 - 好歌茹芸 (2011-05-13)")
     
     # Example 2: Fix multiple album folders
     # download_dir = config.get_download_dir()
