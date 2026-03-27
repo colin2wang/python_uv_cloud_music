@@ -4,16 +4,16 @@ A powerful Python-based tool for organizing, downloading, and managing your digi
 
 ## Features
 
-- 🎵 **Multi-format Support**: Works with MP3, FLAC, M4A, AAC, and other popular audio formats
-- 🏷️ **Automatic Metadata Tagging**: Embeds title, artist, album, track number, and lyrics directly into audio files
-- 🖼️ **Cover Art Integration**: Automatically downloads and embeds high-quality album artwork
-- 📝 **Lyrics Download**: Saves synchronized lyrics files alongside your music
-- 🎼 **Playlist Management**: Extract and download entire playlists with a single command
-- 💿 **Album Processing**: Download complete albums with proper track ordering and metadata
-- 🔍 **Smart Search**: Find songs by keyword and preview before downloading
-- 📦 **Batch Processing**: Efficiently process multiple tracks simultaneously
-- 🎯 **Quality Selection**: Choose from multiple quality levels (standard, high quality, lossless)
-- ⚡ **Intelligent Filename Handling**: Automatically cleans special characters and adds track numbering
+- **Multi-format Support**: Works with MP3, FLAC, M4A, AAC, and other popular audio formats
+- **Automatic Metadata Tagging**: Embeds title, artist, album, track number, and lyrics directly into audio files
+- **Cover Art Integration**: Automatically downloads and embeds high-quality album artwork
+- **Lyrics Download**: Saves synchronized lyrics files alongside your music
+- **Playlist Management**: Extract and download entire playlists with a single command
+- **Album Processing**: Download complete albums with proper track ordering and metadata
+- **Smart Search**: Find songs by keyword and preview before downloading
+- **Batch Processing**: Efficiently process multiple tracks simultaneously
+- **Quality Selection**: Choose from multiple quality levels (standard, high quality, lossless)
+- **Intelligent Filename Handling**: Automatically cleans special characters and adds track numbering
 
 ## Installation
 
@@ -173,7 +173,7 @@ api:
 
 Or programmatically:
 ```python
-api = NeteaseMusicToolAPI(base_url="https://your-custom-api.com")
+api = MusicToolAPI(base_url="https://your-custom-api.com")
 ```
 
 ### Error Handling
@@ -220,7 +220,7 @@ Special characters are automatically replaced with underscores to ensure cross-p
 
 ## Limitations
 
-- Requires valid song/album/playlist IDs from the music platform
+- Requires valid song/album/playlist IDs from the supported music source
 - Download quality depends on source availability
 - Some regions may have restricted access
 
@@ -264,4 +264,4 @@ This tool is designed for organizing personally licensed music. Please respect c
 
 ---
 
-**Enjoy your organized music library! 🎵**
+**Enjoy your organized music library!**

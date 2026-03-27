@@ -1,5 +1,5 @@
 """
-Utility functions for Netease Cloud Music Downloader
+Utility functions for Music Library Organizer
 
 This module provides common utility functions used across the project.
 """

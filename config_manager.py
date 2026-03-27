@@ -1,5 +1,5 @@
 """
-Configuration Manager for Netease Cloud Music Downloader
+Configuration Manager for Music Library Organizer
 
 This module handles loading and accessing configuration settings from config.yml
 """

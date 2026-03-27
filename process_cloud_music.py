@@ -23,17 +23,17 @@ from utils import (
 logger = setup_logger(__name__)
 
 
-class NeteaseMusicToolAPI:
+class MusicToolAPI:
     """
-    Netease Music API Client
+    Music API Client
 
-    Provides methods to interact with Netease Cloud Music API,
+    Provides methods to interact with the music source API,
     including search, song parsing, playlist parsing, and album parsing.
     """
 
     def __init__(self, base_url: str = None):
         """
-        Initialize the Netease Music API client
+        Initialize the Music API client.
 
         Args:
             base_url: Base URL for the API endpoint (default: from config)
@@ -181,8 +181,8 @@ class NeteaseMusicToolAPI:
 
 # ==================== Usage Examples ====================
 
-# Define quality level list (in order of preference)
-QUALITY_LEVELS = ["lossless", "exhigh", "standard"]
+# Define quality level list that will be try if fail with input level (in order of preference)
+TRY_QUALITY_LEVELS = ["lossless", "exhigh", "standard"]
 
 
 def random_sleep(max_delay: float = None):
@@ -209,7 +209,7 @@ def get_song_ids_by_playlist_id(playlist_id: str) -> dict:
     Returns:
         Dictionary containing playlist information and song ID list
     """
-    api = NeteaseMusicToolAPI(config.get_api_base_url())
+    api = MusicToolAPI(config.get_api_base_url())
 
     logger.info("=" * 60)
     logger.info("Extract Songs from Playlist ID")
@@ -307,7 +307,7 @@ def get_song_ids_by_album_id(album_id: str) -> dict:
     Returns:
         Dictionary containing album information and song ID list
     """
-    api = NeteaseMusicToolAPI(config.get_api_base_url())
+    api = MusicToolAPI(config.get_api_base_url())
 
     logger.info("=" * 60)
     logger.info("Extract Songs from Album ID")
@@ -405,7 +405,7 @@ def get_song_metadata_by_song_id(song_id: str, level: str | None = None) -> dict
         Dictionary containing detailed song information with download links
     """
     try:
-        api = NeteaseMusicToolAPI(config.get_api_base_url())
+        api = MusicToolAPI(config.get_api_base_url())
 
         # Use default quality from config if not specified
         if level is None:
@@ -422,7 +422,7 @@ def get_song_metadata_by_song_id(song_id: str, level: str | None = None) -> dict
         used_level = None
 
         # Try different quality levels
-        for qual in QUALITY_LEVELS:
+        for qual in TRY_QUALITY_LEVELS:
             try:
                 result_str = api.parse_song(song_id, level=qual)
 
@@ -447,7 +447,7 @@ def get_song_metadata_by_song_id(song_id: str, level: str | None = None) -> dict
                 continue
 
         if not result:
-            return {"success": False, "message": "No available quality", "tried_levels": quality_levels}
+            return {"success": False, "message": "No available quality", "tried_levels": TRY_QUALITY_LEVELS}
 
         if result and result.get('status') == 200:
             data = result['data']
@@ -1096,7 +1096,7 @@ if __name__ == "__main__":
     # indexes = [4, 6, 15, 18, 19]
 
     # Part-2 Download Songs by Album ID
-    download_album("30465", indexes)
+    download_album("262841658", indexes)
 
     # Part-3 Download Playlist
     # download_playlist("5453912201", indexes)

@@ -20,9 +20,9 @@ logger = setup_logger(__name__)
 class AlbumLyricFixer:
     """
     Album Lyric Fixer
-    
+
     Scans album folders and fixes truncated lyrics in music files
-    by re-downloading complete lyrics from NetEase Cloud Music API
+    by re-downloading complete lyrics from the music source API
     """
     
     def __init__(self, album_folder: str):
@@ -84,8 +84,8 @@ class AlbumLyricFixer:
     
     def fetch_album_songs(self) -> bool:
         """
-        Fetch all songs from the album using NetEase API
-        
+        Fetch all songs from the album using the API.
+
         Returns:
             bool: Whether songs were fetched successfully
         """
