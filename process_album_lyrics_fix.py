@@ -8,10 +8,10 @@ from mutagen.flac import FLAC
 from mutagen.id3 import ID3, COMM
 from mutagen.mp4 import MP4
 
-from logging_config import setup_logger
 from config_manager import config
+from logging_config import setup_logger
 from process_cloud_music import get_song_ids_by_album_id, get_song_metadata_by_song_id
-from utils import get_audio_extension, clean_filename, safe_get
+from utils import clean_filename
 
 # Create logger
 logger = setup_logger(__name__)

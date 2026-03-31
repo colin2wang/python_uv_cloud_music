@@ -1,82 +1,87 @@
 """
-文件夹列表工具
+Folder List Utility
 
-功能：
-- 列出指定目录中的所有子文件夹
+Functionality:
+- List all subdirectories in a specified directory
 
-使用方法：
+Usage:
     from list_folders import list_folders, iterate_folders, process_folders
     
-    # 列出所有文件夹
-    folders = list_folders("J:\\音乐")
+    # List all folders
+    folders = list_folders("J:\\Music")
     
-    # 使用迭代器逐个处理
-    for folder in iterate_folders("J:\\音乐"):
+    # Iterate and process one by one
+    for folder in iterate_folders("J:\\Music"):
         process_album(folder)
     
-    # 批量处理
+    # Batch processing
     def my_process_func(folder_path):
         return do_something(folder_path)
     
-    results = process_folders("J:\\音乐", my_process_func)
+    results = process_folders("J:\\Music", my_process_func)
 """
 
 from pathlib import Path
 from typing import List, Optional
 
+from logging_config import setup_logger
+from process_album_cover_redownload import redownload_album_cover
 from process_album_lyrics_fix import fix_album_lyrics
+
+# Create logger
+logger = setup_logger(__name__)
 
 
 def list_folders(directory: str) -> List[str]:
     """
-    列出目录中的所有文件夹
+    List all folders in a directory
 
     Args:
-        directory: 目录路径
+        directory: Directory path
 
     Returns:
-        文件夹绝对路径列表（已排序）
+        List of folder absolute paths (sorted)
 
-    示例:
-        # 列出所有文件夹
-        folders = list_folders("J:\\音乐")
+    Example:
+        # List all folders
+        folders = list_folders("J:\\Music")
     """
     dir_path = Path(directory)
 
     if not dir_path.exists():
-        raise FileNotFoundError(f"目录不存在: {directory}")
-
+        raise FileNotFoundError(f"Directory does not exist: {directory}")
+    
     if not dir_path.is_dir():
-        raise NotADirectoryError(f"路径不是目录: {directory}")
+        raise NotADirectoryError(f"Path is not a directory: {directory}")
 
-    # 获取所有子文件夹（不递归）
+    # Get all subdirectories (non-recursive)
     folders = []
     for item in dir_path.iterdir():
         if item.is_dir():
-            # 跳过隐藏文件夹（以.开头）
+            # Skip hidden folders (starting with .)
             if not item.name.startswith('.'):
                 folders.append(item)
 
-    # 按名称排序（使用默认排序：Unicode 编码顺序）
+    # Sort by name (default: Unicode encoding order)
     folders.sort(key=lambda x: x.name.lower())
 
-    # 返回绝对路径列表
+    # Return list of absolute paths
     return [str(folder.resolve()) for folder in folders]
 
 
 def iterate_folders(directory: str):
     """
-    迭代器：逐个返回文件夹路径，方便在循环中处理
+    Iterator: Yield folder paths one by one for easy processing in loops
 
     Args:
-        directory: 目录路径
+        directory: Directory path
 
     Yields:
-        文件夹绝对路径
+        Folder absolute path
 
-    示例:
+    Example:
         from list_folders import iterate_folders
-        for folder in iterate_folders("J:\\音乐"):
+        for folder in iterate_folders("J:\\Music"):
             process_album(folder)
     """
     folders = list_folders(directory)
@@ -87,29 +92,29 @@ def iterate_folders(directory: str):
 def process_folders(directory: str, process_func, show_progress: bool = True,
                    stop_on_error: bool = False):
     """
-    批量处理文件夹
+    Batch process folders
 
     Args:
-        directory: 目录路径
-        process_func: 处理函数，接收文件夹绝对路径作为参数
-        show_progress: 是否显示进度信息
-        stop_on_error: 遇到错误时是否停止（False 则跳过继续处理）
+        directory: Directory path
+        process_func: Processing function, receives folder absolute path as parameter
+        show_progress: Whether to show progress information
+        stop_on_error: Stop when encountering error (False means skip and continue)
 
     Returns:
-        处理结果列表，每个元素包含 folder, success, result, error
+        List of processing results, each element contains folder, success, result, error
 
-    示例:
+    Example:
         from list_folders import process_folders
         from process_album_lyrics_fix import fix_album_lyrics
 
         results = process_folders(
-            "J:\\音乐",
+            "J:\\Music",
             fix_album_lyrics,
             show_progress=True
         )
 
         for r in results:
-            print(f"{r['folder']}: {'成功' if r['success'] else '失败'}")
+            logger.info(f"{r['folder']}: {'Success' if r['success'] else 'Failed'}")
     """
     from datetime import datetime
 
@@ -119,9 +124,9 @@ def process_folders(directory: str, process_func, show_progress: bool = True,
     start_time = datetime.now()
 
     if show_progress:
-        print("=" * 60)
-        print(f"开始处理 {total} 个文件夹")
-        print("=" * 60)
+        logger.info("=" * 60)
+        logger.info(f"Starting to process {total} folders")
+        logger.info("=" * 60)
     
     for idx, folder in enumerate(folders, 1):
         result = {
@@ -134,113 +139,118 @@ def process_folders(directory: str, process_func, show_progress: bool = True,
         
         if show_progress:
             folder_name = Path(folder).name
-            print(f"\n[{idx}/{total}] 处理: {folder_name}")
-            print(f"路径: {folder}")
+            logger.info(f"[{idx}/{total}] Processing: {folder_name}")
+            logger.info(f"Path: {folder}")
         
         try:
-            # 调用处理函数
+            # Call the processing function
             process_result = process_func(folder)
             result['success'] = True
             result['result'] = process_result
             
             if show_progress:
-                print(f"✓ 处理成功")
+                logger.info("✓ Processing successful")
         
         except Exception as e:
             result['success'] = False
             result['error'] = str(e)
             
             if show_progress:
-                print(f"✗ 处理失败: {e}")
+                logger.error(f"✗ Processing failed: {e}")
             
             if stop_on_error:
-                print(f"\n遇到错误，停止处理")
+                logger.warning("\nEncountered error, stopping processing")
                 break
         
         results.append(result)
         
         if show_progress:
-            # 显示当前进度
+            # Show current progress
             elapsed = (datetime.now() - start_time).total_seconds()
             if idx > 1:
                 avg_time = elapsed / idx
                 remaining = avg_time * (total - idx)
-                print(f"进度: {idx}/{total} | 已用: {elapsed:.1f}秒 | 预计剩余: {remaining:.1f}秒")
+                logger.info(f"Progress: {idx}/{total} | Elapsed: {elapsed:.1f}s | Estimated remaining: {remaining:.1f}s")
     
     if show_progress:
-        # 显示汇总
+        # Show summary
         success_count = sum(1 for r in results if r['success'])
         failed_count = total - success_count
         elapsed = (datetime.now() - start_time).total_seconds()
         
-        print("\n" + "=" * 60)
-        print("处理完成")
-        print(f"总计: {total} 个文件夹")
-        print(f"成功: {success_count} 个")
-        print(f"失败: {failed_count} 个")
-        print(f"耗时: {elapsed:.1f}秒")
-        print("=" * 60)
+        logger.info("\n" + "=" * 60)
+        logger.info("Processing completed")
+        logger.info(f"Total: {total} folders")
+        logger.info(f"Successful: {success_count}")
+        logger.info(f"Failed: {failed_count}")
+        logger.info(f"Duration: {elapsed:.1f}s")
+        logger.info("=" * 60)
     
     return results
 
 
 def print_folders(folders: List[str], show_index: bool = False):
     """
-    打印文件夹列表
+    Print folder list
     
     Args:
-        folders: 文件夹路径列表
-        show_index: 是否显示索引编号
+        folders: Folder path list
+        show_index: Whether to show index numbers
     """
     if not folders:
-        print("没有找到任何文件夹")
+        logger.info("No folders found")
         return
     
-    print(f"找到 {len(folders)} 个文件夹:")
-    print("-" * 60)
+    logger.info(f"Found {len(folders)} folders:")
+    logger.info("-" * 60)
     
     for i, folder in enumerate(folders):
         if show_index:
-            print(f"{i+1:3d}. {folder}")
+            logger.info(f"{i+1:3d}. {folder}")
         else:
-            print(folder)
+            logger.info(folder)
     
-    print("-" * 60)
-    print(f"总计: {len(folders)} 个文件夹")
+    logger.info("-" * 60)
+    logger.info(f"Total: {len(folders)} folders")
 
 
 def main():
-    # 配置：设置目录
-    target_directory = r"J:\我的音乐\我的专辑\动漫原声"
+    # Configuration: Set directory
+    target_directory = r"F:\我的音乐\我的专辑\华语流行"
 
-    # 输出选项
-    show_index = True  # 是否显示索引编号
-    quiet_mode = True  # 安静模式，只输出路径（每行一个）
+    # Output options
+    show_index = True  # Whether to show index numbers
+    quiet_mode = True  # Quiet mode, only output paths (one per line)
 
     try:
-        # 列出文件夹
+        # List folders
         folders = list_folders(target_directory)
 
         if quiet_mode:
-            # 安静模式：只输出路径，每行一个
+            # Quiet mode: Only output paths, one per line
             for folder in folders:
-                print(folder)
-                fix_album_lyrics(folder)
+                logger.info(folder)
+
+                # Fix album lyrics issues.
+                # fix_album_lyrics(folder)
+
+                # Redownload album cover.
+                redownload_album_cover(folder)
         else:
-            # 正常模式：显示格式化输出
-            print(f"排序方式: 默认排序 (Unicode)")
-            print()
+            # Normal mode: Show formatted output
+            logger.info("Sort order: Default (Unicode)")
+            logger.info("")
             print_folders(folders, show_index=show_index)
 
     
     except FileNotFoundError as e:
-        print(f"错误: {e}")
+        logger.error(f"Error: {e}")
     except NotADirectoryError as e:
-        print(f"错误: {e}")
+        logger.error(f"Error: {e}")
     except ValueError as e:
-        print(f"错误: {e}")
+        logger.error(f"Error: {e}")
     except Exception as e:
-        print(f"未知错误: {e}")
+        logger.error(f"Unknown error: {e}")
 
 
 if __name__ == "__main__":

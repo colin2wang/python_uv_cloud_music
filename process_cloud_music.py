@@ -5,18 +5,17 @@ import re
 import time
 import urllib.parse
 from pathlib import Path
-from typing import Any
 
 import requests
 from mutagen.flac import FLAC, Picture
 from mutagen.id3 import ID3, TIT2, TPE1, TALB, APIC, COMM, TYER
 from mutagen.mp4 import MP4, MP4Cover
 
-from logging_config import setup_logger
 from config_manager import config
+from logging_config import setup_logger
 from utils import (
-    get_audio_extension, is_audio_file, get_image_mime_type,
-    get_mp4_image_format, clean_filename, safe_get
+    get_audio_extension, get_image_mime_type,
+    get_mp4_image_format, clean_filename
 )
 
 # Create logger

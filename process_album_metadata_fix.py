@@ -1,4 +1,3 @@
-import json
 import os
 from pathlib import Path
 from typing import Optional
@@ -8,7 +7,6 @@ from mutagen.id3 import ID3, TIT2, TPE1, TALB, APIC, TYER, TRCK
 from mutagen.mp4 import MP4, MP4Cover
 
 from logging_config import setup_logger
-from config_manager import config
 from utils import (
     get_audio_extension, get_image_mime_type, get_mp4_image_format,
     parse_music_filename, find_cover_image

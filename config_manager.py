@@ -4,7 +4,6 @@ Configuration Manager for Music Library Organizer
 This module handles loading and accessing configuration settings from config.yml
 """
 
-import os
 from pathlib import Path
 from typing import Any
 
