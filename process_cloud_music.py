@@ -973,6 +973,8 @@ def prepare_album_folder(album_metadata: dict, download_dir: str | None = None) 
         album_cover_url = ''
         try:
             album_cover_url = raw_data.get('data', {}).get('album', {}).get('coverImgUrl', '')
+            album_cover_url = album_cover_url.split('?')[0]
+            logger.info(f"Album cover URL: {album_cover_url}")
         except (AttributeError, KeyError):
             logger.warning(f"Could not extract album cover URL")
 
@@ -1014,7 +1016,7 @@ def prepare_album_folder(album_metadata: dict, download_dir: str | None = None) 
             try:
                 logger.info("Downloading album cover...")
                 random_sleep()
-                cover_response = requests.get(album_cover_url + '?param=600x600', timeout=10)
+                cover_response = requests.get(album_cover_url, timeout=10)
                 cover_response.raise_for_status()
 
                 with open(cover_file_path, 'wb') as f:
@@ -1090,13 +1092,13 @@ def download_playlist(playlist_id: str, index_ids: list, level: str | None = Non
 if __name__ == "__main__":
     # Part-1 Download Song by Song ID
     # https://music.163.com/song?id=2052368104
-    # download_song("1419685880")
+    # download_song("33162226")
 
     indexes = []
     # indexes = [4, 6, 15, 18, 19]
 
     # Part-2 Download Songs by Album ID
-    download_album("262841658", indexes)
+    download_album("34567265", indexes)
 
     # Part-3 Download Playlist
     # download_playlist("5453912201", indexes)
