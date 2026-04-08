@@ -440,6 +440,14 @@ def get_song_metadata_by_song_id(song_id: str, level: str | None = None) -> dict
                     try:
                         temp_result = json.loads(result_str)
                         if temp_result.get('status') == 200 and temp_result.get('data', {}).get('url'):
+                            # Check if actual quality matches requested quality
+                            actual_level = temp_result.get('data', {}).get('level', '')
+                            if actual_level and actual_level != qual:
+                                logger.warning(
+                                    f"Quality mismatch: requested {qual}, got {actual_level}. Retrying...")
+                                retry_count += 1
+                                continue
+                            
                             result = temp_result
                             used_level = qual
                             logger.info(f"Found available quality: {qual}")
@@ -1118,7 +1126,7 @@ if __name__ == "__main__":
     # indexes = [4, 6, 15, 18, 19]
 
     # Part-2 Download Songs by Album ID
-    download_album("5858", indexes)
+    download_album("19058", indexes)
 
     # Part-3 Download Playlist
     # download_playlist("5453912201", indexes)
