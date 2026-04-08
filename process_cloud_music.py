@@ -454,10 +454,16 @@ def get_song_metadata_by_song_id(song_id: str, level: str | None = None) -> dict
                             success = True
                             break
                         else:
+                            error_msg = temp_result.get('data', {}).get('msg', 'Unknown reason')
                             logger.warning(
-                                f"Quality {qual} not available: {temp_result.get('data', {}).get('msg', 'Unknown reason')}")
-                            # Don't retry if the quality is genuinely not available
-                            break
+                                f"Quality {qual} not available (attempt {retry_count + 1}): {error_msg}")
+                            # Retry for temporary failures, but not for permanent unavailability
+                            if retry_count < max_retries:
+                                retry_count += 1
+                                continue
+                            else:
+                                # Max retries reached, move to next quality level
+                                break
                     except json.JSONDecodeError:
                         logger.error(f"Quality {qual} parsing failed (attempt {retry_count + 1})")
                         retry_count += 1
@@ -1126,7 +1132,7 @@ if __name__ == "__main__":
     # indexes = [4, 6, 15, 18, 19]
 
     # Part-2 Download Songs by Album ID
-    download_album("19058", indexes)
+    download_album("39135", indexes)
 
     # Part-3 Download Playlist
     # download_playlist("5453912201", indexes)
