@@ -410,11 +410,15 @@ def get_song_metadata_by_song_id(song_id: str, level: str | None = None) -> dict
         if level is None:
             level = config.get_default_quality()
 
+        # Get max retries from config
+        max_retries = config.get_max_retries()
+
         logger.info("=" * 60)
         logger.info("Extract Song Metadata by Song ID")
         logger.info("=" * 60)
         logger.info(f"Song ID: {song_id}")
         logger.info(f"Quality Level: {level}")
+        logger.info(f"Max Retries: {max_retries}")
         logger.info("-" * 60)
 
         result = None
@@ -422,28 +426,45 @@ def get_song_metadata_by_song_id(song_id: str, level: str | None = None) -> dict
 
         # Try different quality levels
         for qual in TRY_QUALITY_LEVELS:
-            try:
-                result_str = api.parse_song(song_id, level=qual)
+            retry_count = 0
+            success = False
 
+            while retry_count <= max_retries and not success:
                 try:
-                    temp_result = json.loads(result_str)
-                    if temp_result.get('status') == 200 and temp_result.get('data', {}).get('url'):
-                        result = temp_result
-                        used_level = qual
-                        logger.info(f"Found available quality: {qual}")
-                        break
-                    else:
-                        logger.warning(
-                            f"Quality {qual} not available: {temp_result.get('data', {}).get('msg', 'Unknown reason')}")
-                except json.JSONDecodeError:
-                    logger.error(f"Quality {qual} parsing failed")
+                    if retry_count > 0:
+                        logger.info(f"Retry {retry_count}/{max_retries} for quality {qual}...")
+                        random_sleep()
+                    
+                    result_str = api.parse_song(song_id, level=qual)
+
+                    try:
+                        temp_result = json.loads(result_str)
+                        if temp_result.get('status') == 200 and temp_result.get('data', {}).get('url'):
+                            result = temp_result
+                            used_level = qual
+                            logger.info(f"Found available quality: {qual}")
+                            success = True
+                            break
+                        else:
+                            logger.warning(
+                                f"Quality {qual} not available: {temp_result.get('data', {}).get('msg', 'Unknown reason')}")
+                            # Don't retry if the quality is genuinely not available
+                            break
+                    except json.JSONDecodeError:
+                        logger.error(f"Quality {qual} parsing failed (attempt {retry_count + 1})")
+                        retry_count += 1
+                        continue
+                except requests.exceptions.RequestException as e:
+                    logger.error(f"Network request failed (Quality {qual}, attempt {retry_count + 1}): {str(e)}")
+                    retry_count += 1
                     continue
-            except requests.exceptions.RequestException as e:
-                logger.error(f"Network request failed (Quality {qual}): {str(e)}")
-                continue
-            except Exception as e:
-                logger.error(f"Unknown error occurred while getting quality {qual}: {str(e)}")
-                continue
+                except Exception as e:
+                    logger.error(f"Unknown error occurred while getting quality {qual} (attempt {retry_count + 1}): {str(e)}")
+                    retry_count += 1
+                    continue
+
+            if success:
+                break
 
         if not result:
             return {"success": False, "message": "No available quality", "tried_levels": TRY_QUALITY_LEVELS}
@@ -1091,13 +1112,13 @@ def download_playlist(playlist_id: str, index_ids: list, level: str | None = Non
 if __name__ == "__main__":
     # Part-1 Download Song by Song ID
     # https://music.163.com/song?id=2052368104
-    # download_song("33162226")
+    # download_song("2014307526")
 
     indexes = []
     # indexes = [4, 6, 15, 18, 19]
 
     # Part-2 Download Songs by Album ID
-    download_album("34567265", indexes)
+    download_album("5858", indexes)
 
     # Part-3 Download Playlist
     # download_playlist("5453912201", indexes)

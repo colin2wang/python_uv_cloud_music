@@ -63,6 +63,9 @@ network:
   # Minimum delay between API calls in seconds
   api_delay_min: 1.0
 
+  # Number of retries for failed requests (default: 1)
+  max_retries: 1
+
 # Logging Configuration
 logging:
   # Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)

@@ -122,7 +122,8 @@ class ConfigManager:
             'network': {
                 'timeout': 30,
                 'random_delay_max': 2.5,
-                'api_delay_min': 1.0
+                'api_delay_min': 1.0,
+                'max_retries': 1
             },
             'logging': {
                 'level': 'INFO',
@@ -238,6 +239,10 @@ class ConfigManager:
     def get_api_delay_min(self) -> float:
         """Get minimum delay between API calls"""
         return self.get('network.api_delay_min', 1.0)
+    
+    def get_max_retries(self) -> int:
+        """Get maximum number of retries for failed requests"""
+        return self.get('network.max_retries', 1)
     
     def reload(self) -> dict:
         """
