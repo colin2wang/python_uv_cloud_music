@@ -948,7 +948,7 @@ def download_song_and_resources(
         logger.info("Adding cover to song file...")
         write_picture_to_file(music_file_path)
 
-    logger.info(f"\nDownload completed! Files saved in: {download_dir}")
+    logger.info(f"Download completed! Files saved in: {download_dir}")
     return True
 
 
