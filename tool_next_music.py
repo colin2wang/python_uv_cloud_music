@@ -56,11 +56,16 @@ class NextMusicTool:
         }
         
         response_json = requests.post(self.API_URL, json=data, headers=self.HEADERS).json()
-        if response_json['code'] == 401:
+
+        status_code = response_json['code']
+
+        logger.info(f"NextMusic API response status code: {status_code}")
+
+        if status_code == 401:
             # Retry with 401
             logger.warning("NextMusic API returned 401. Retrying with new token...")
             return self.get_song_url(song_id, level)
-        if response_json['code'] != 200:
+        if status_code != 200:
             logger.error(f"NextMusic API returned error: {response_json['message']}")
         return response_json
 
