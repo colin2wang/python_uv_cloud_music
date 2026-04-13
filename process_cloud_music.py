@@ -13,6 +13,7 @@ from mutagen.mp4 import MP4, MP4Cover
 
 from config_manager import config
 from logging_config import setup_logger
+from tool_next_music import NextMusicTool
 from utils import (
     get_audio_extension, get_image_mime_type,
     get_mp4_image_format, clean_filename
@@ -181,8 +182,8 @@ class MusicToolAPI:
 # ==================== Usage Examples ====================
 
 # Define quality level list that will be try if fail with input level (in order of preference)
-TRY_QUALITY_LEVELS = ["lossless", "exhigh", "standard"]
-
+# TRY_QUALITY_LEVELS = ["lossless", "exhigh", "standard"]
+TRY_QUALITY_LEVELS = ["standard"]
 
 def random_sleep(max_delay: float = None):
     """
@@ -392,7 +393,7 @@ def get_song_ids_by_album_id(album_id: str) -> dict:
         return {"success": False, "message": f"Processing failed: {str(e)}", "album_id": album_id}
 
 
-def get_song_metadata_by_song_id(song_id: str, level: str | None = None) -> dict:
+def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> dict:
     """
     Extract song information by song ID.
 
@@ -406,9 +407,11 @@ def get_song_metadata_by_song_id(song_id: str, level: str | None = None) -> dict
     try:
         api = MusicToolAPI(config.get_api_base_url())
 
+        try_quality_level = config.get_default_quality()
+
         # Use default quality from config if not specified
         if level is None:
-            level = config.get_default_quality()
+            try_quality_level = level
 
         # Get max retries from config
         max_retries = config.get_max_retries()
@@ -424,61 +427,69 @@ def get_song_metadata_by_song_id(song_id: str, level: str | None = None) -> dict
         result = None
         used_level = None
 
-        # Try different quality levels
-        for qual in TRY_QUALITY_LEVELS:
-            retry_count = 0
-            success = False
+        retry_count = 0
+        success = False
 
-            while retry_count <= max_retries and not success:
+        while retry_count < max_retries and not success:
+            try:
+                if retry_count > 0:
+                    logger.info(f"Retry {retry_count}/{max_retries} for quality {try_quality_level}...")
+                    random_sleep()
+
+                result_str = api.parse_song(song_id, try_quality_level)
+
                 try:
-                    if retry_count > 0:
-                        logger.info(f"Retry {retry_count}/{max_retries} for quality {qual}...")
-                        random_sleep()
-                    
-                    result_str = api.parse_song(song_id, level=qual)
+                    result_json = json.loads(result_str)
 
-                    try:
-                        temp_result = json.loads(result_str)
-                        if temp_result.get('status') == 200 and temp_result.get('data', {}).get('url'):
-                            # Check if actual quality matches requested quality
-                            actual_level = temp_result.get('data', {}).get('level', '')
-                            if actual_level and actual_level != qual:
-                                logger.warning(
-                                    f"Quality mismatch: requested {qual}, got {actual_level}. Retrying...")
-                                retry_count += 1
-                                continue
-                            
-                            result = temp_result
-                            used_level = qual
-                            logger.info(f"Found available quality: {qual}")
-                            success = True
-                            break
-                        else:
-                            error_msg = temp_result.get('data', {}).get('msg', 'Unknown reason')
+                    # Replace url using Next Music Tool
+                    next_music_tool = NextMusicTool()
+                    # next_music_tool = NextMusicTool(token=NEXT_MUSIC_TOKEN)
+                    response = next_music_tool.get_song_url(song_id, try_quality_level)
+                    result_json['data']['url'] = response.get('data', {}).get('url')
+                    result_json['data']['level'] = response.get('data', {}).get('level')
+                    result_json['data']['size'] = response.get('data', {}).get('size')
+
+                    if result_json.get('status') == 200 and result_json.get('data', {}).get('url'):
+                        # Set result first
+                        result = result_json
+
+                        # Check if actual quality matches requested quality
+                        actual_level = result_json.get('data', {}).get('level', '')
+                        if actual_level and actual_level != try_quality_level:
                             logger.warning(
-                                f"Quality {qual} not available (attempt {retry_count + 1}): {error_msg}")
-                            # Retry for temporary failures, but not for permanent unavailability
-                            if retry_count < max_retries:
-                                retry_count += 1
-                                continue
-                            else:
-                                # Max retries reached, move to next quality level
-                                break
-                    except json.JSONDecodeError:
-                        logger.error(f"Quality {qual} parsing failed (attempt {retry_count + 1})")
-                        retry_count += 1
-                        continue
-                except requests.exceptions.RequestException as e:
-                    logger.error(f"Network request failed (Quality {qual}, attempt {retry_count + 1}): {str(e)}")
-                    retry_count += 1
-                    continue
-                except Exception as e:
-                    logger.error(f"Unknown error occurred while getting quality {qual} (attempt {retry_count + 1}): {str(e)}")
-                    retry_count += 1
-                    continue
+                                f"Quality mismatch: expected: [{try_quality_level}], actual: [{actual_level}]. Retrying...")
+                            retry_count += 1
+                            continue
 
-            if success:
-                break
+                        used_level = try_quality_level
+                        logger.info(f"Found available quality: {try_quality_level}")
+                        success = True
+                        break
+                    else:
+                        error_msg = result_json.get('data', {}).get('msg', 'Unknown reason')
+                        logger.warning(
+                            f"Quality {try_quality_level} not available (attempt {retry_count + 1}): {error_msg}")
+                        # Retry for temporary failures, but not for permanent unavailability
+                        if retry_count < max_retries:
+                            retry_count += 1
+                            continue
+                        else:
+                            # Max retries reached, move to next quality level
+                            break
+                except json.JSONDecodeError:
+                    logger.error(f"Quality {try_quality_level} parsing failed (attempt {retry_count + 1})")
+                    retry_count += 1
+                    continue
+            except requests.exceptions.RequestException as e:
+                logger.error(
+                    f"Network request failed (Quality {try_quality_level}, attempt {retry_count + 1}): {str(e)}")
+                retry_count += 1
+                continue
+            except Exception as e:
+                logger.error(
+                    f"Unknown error occurred while getting quality {try_quality_level} (attempt {retry_count + 1}): {str(e)}")
+                retry_count += 1
+                continue
 
         if not result:
             return {"success": False, "message": "No available quality", "tried_levels": TRY_QUALITY_LEVELS}
@@ -957,7 +968,7 @@ def download_song_and_resources(
     return True
 
 
-def download_song(song_id: str, level: str | None = None):
+def download_song(song_id: str, level: str = "lossless"):
     if level is None:
         level = config.get_default_quality()
     metadata = get_song_metadata_by_song_id(song_id, level)
@@ -1069,7 +1080,7 @@ def prepare_album_folder(album_metadata: dict, download_dir: str | None = None) 
         return None
 
 
-def download_album(album_id: str, index_ids: list, level: str | None = None):
+def download_album(album_id: str, index_ids: list, level: str = "lossless"):
     if level is None:
         level = config.get_default_quality()
     album_metadata = get_song_ids_by_album_id(album_id)
@@ -1100,7 +1111,7 @@ def download_album(album_id: str, index_ids: list, level: str | None = None):
     logger.info(f"Completed downloading album: {album_artist} - {album_name}")
 
 
-def download_playlist(playlist_id: str, index_ids: list, level: str | None = None):
+def download_playlist(playlist_id: str, index_ids: list, level: str = "lossless"):
     if level is None:
         level = config.get_default_quality()
     playlist_metadata = get_song_ids_by_playlist_id(playlist_id)
@@ -1122,17 +1133,19 @@ def download_playlist(playlist_id: str, index_ids: list, level: str | None = Non
             download_song_and_resources(metadata, idx=None)
         index += 1
 
+NEXT_MUSIC_TOKEN = "59e2b0fa43bb7733b4ae62487f108144"
 
 if __name__ == "__main__":
     # Part-1 Download Song by Song ID
     # https://music.163.com/song?id=2052368104
     # download_song("2014307526")
 
-    indexes = []
+    indexes = [19]
     # indexes = [4, 6, 15, 18, 19]
+    # indexes = list(range(5, 9))
 
     # Part-2 Download Songs by Album ID
-    download_album("39135", indexes)
+    download_album("34923011", indexes)
 
     # Part-3 Download Playlist
     # download_playlist("5453912201", indexes)
