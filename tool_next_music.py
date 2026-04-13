@@ -76,7 +76,7 @@ if __name__ == "__main__":
     tool = NextMusicTool()
     
     # Get song URL
-    song_id = 74674741
+    song_id = 255852
     result = tool.get_song_url(song_id)
     
     print(json.dumps(result, indent=2, ensure_ascii=False))

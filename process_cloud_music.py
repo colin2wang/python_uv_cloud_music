@@ -1128,7 +1128,7 @@ if __name__ == "__main__":
     # indexes = list(range(11, 13))
 
     # Part-2 Download Songs by Album ID
-    download_album("25554", indexes)
+    download_album("74674741", indexes)
 
     # Part-3 Download Playlist
     # download_playlist("5453912201", indexes)
