@@ -63,7 +63,11 @@ class NextMusicTool:
                 random_sleep(3.0, reason="Before NextMusic API request")
                 response = requests.post(self.API_URL, json=data, headers=self.HEADERS)
                 response.raise_for_status()
-                return response.json()
+
+                response_json = response.json()
+                logger.info(f"Finish get song URL for ID: {response_json["data"]["id"]}")
+
+                return response_json
             except requests.exceptions.RequestException as e:
                 if retry >= MAX_RETRY:
                     logger.error(f"Max retry reached, giving up: {e}")
@@ -76,7 +80,7 @@ if __name__ == "__main__":
     tool = NextMusicTool()
     
     # Get song URL
-    song_id = 255852
+    song_id = 238847
     result = tool.get_song_url(song_id)
     
     print(json.dumps(result, indent=2, ensure_ascii=False))
