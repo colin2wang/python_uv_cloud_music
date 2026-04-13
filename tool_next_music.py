@@ -13,6 +13,7 @@ from utils import random_sleep
 # Create logger
 logger = setup_logger(__name__)
 
+MAX_RETRY = 3
 
 class NextMusicTool:
     """NextMusic API tool for getting song URLs"""
@@ -56,20 +57,18 @@ class NextMusicTool:
             "token": self.next_token()
         }
 
-        random_sleep(3.0, reason="Before NextMusic API request")
-        response_json = requests.post(self.API_URL, json=data, headers=self.HEADERS).json()
-
-        status_code = response_json['code']
-
-        logger.info(f"NextMusic API response status code: {status_code}")
-
-        if status_code == 401:
-            # Retry with 401
-            logger.warning("NextMusic API returned 401. Retrying with new token...")
-            return self.get_song_url(song_id, level)
-        if status_code != 200:
-            logger.error(f"NextMusic API returned error: {response_json['message']}")
-        return response_json
+        retry = 0
+        while True:
+            try:
+                random_sleep(3.0, reason="Before NextMusic API request")
+                response = requests.post(self.API_URL, json=data, headers=self.HEADERS)
+                response.raise_for_status()
+                return response.json()
+            except requests.exceptions.RequestException as e:
+                if retry >= MAX_RETRY:
+                    logger.error(f"Max retry reached, giving up: {e}")
+                    break
+                logger.error(f"Error making request to NextMusic API: {e}, retry in {++retry}")
 
 
 if __name__ == "__main__":
@@ -77,7 +76,7 @@ if __name__ == "__main__":
     tool = NextMusicTool()
     
     # Get song URL
-    song_id = 277759
+    song_id = 74674741
     result = tool.get_song_url(song_id)
     
     print(json.dumps(result, indent=2, ensure_ascii=False))
