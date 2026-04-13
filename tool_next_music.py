@@ -8,6 +8,7 @@ import time
 import requests
 
 from logging_config import setup_logger
+from utils import random_sleep
 
 # Create logger
 logger = setup_logger(__name__)
@@ -54,7 +55,8 @@ class NextMusicTool:
             "level": level,
             "token": self.next_token()
         }
-        
+
+        random_sleep(3.0, reason="Before NextMusic API request")
         response_json = requests.post(self.API_URL, json=data, headers=self.HEADERS).json()
 
         status_code = response_json['code']

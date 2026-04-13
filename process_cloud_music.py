@@ -1,6 +1,5 @@
 import json
 import os
-import random
 import re
 import time
 import urllib.parse
@@ -16,7 +15,7 @@ from logging_config import setup_logger
 from tool_next_music import NextMusicTool
 from utils import (
     get_audio_extension, get_image_mime_type,
-    get_mp4_image_format, clean_filename
+    get_mp4_image_format, clean_filename, random_sleep
 )
 
 # Create logger
@@ -106,7 +105,7 @@ class MusicToolAPI:
             JSON response string containing search results
         """
 
-        random_sleep(5.0)
+        random_sleep(5.0, reason="Before search API request")
         response = self.session.post(
             f"{self.base_url}/Search",
             data={'keyword': keyword, 'limit': limit}
@@ -128,7 +127,7 @@ class MusicToolAPI:
         """
         song_id = self._extract_id(song_id_or_url, 'song')
 
-        random_sleep(3.0)
+        random_sleep(3.0, reason="Before song parsing API request")
         response = self.session.post(
             f"{self.base_url}/Song_V1",
             data={'url': song_id, 'level': level, 'type': 'json'}
@@ -149,7 +148,7 @@ class MusicToolAPI:
         """
         playlist_id = self._extract_id(playlist_id_or_url, 'playlist')
 
-        random_sleep(3.0)
+        random_sleep(3.0, reason="Before playlist parsing API request")
         response = self.session.get(
             f"{self.base_url}/Playlist",
             params={'id': playlist_id}
@@ -171,7 +170,7 @@ class MusicToolAPI:
         """
         album_id = self._extract_id(album_id_or_url, 'album')
 
-        random_sleep(3.0)
+        random_sleep(3.0, reason="Before album parsing API request")
         response = self.session.get(
             f"{self.base_url}/Album",
             params={'id': album_id}
@@ -184,20 +183,6 @@ class MusicToolAPI:
 # Define quality level list that will be try if fail with input level (in order of preference)
 # TRY_QUALITY_LEVELS = ["lossless", "exhigh", "standard"]
 TRY_QUALITY_LEVELS = ["standard"]
-
-def random_sleep(max_delay: float = None):
-    """
-    Add random delay to avoid frequent requests
-
-    Args:
-        max_delay: Maximum delay in seconds (default: from config)
-    """
-    if max_delay is None:
-        max_delay = config.get_random_delay_max()
-    delay = random.uniform(1.0, max_delay)
-    logger.info(f"Sleeping for {delay:.2f} seconds...")
-    time.sleep(delay)
-
 
 def get_song_ids_by_playlist_id(playlist_id: str) -> dict:
     """
@@ -434,7 +419,7 @@ def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> dict:
             try:
                 if retry_count > 0:
                     logger.info(f"Retry {retry_count}/{max_retries} for quality {try_quality_level}...")
-                    random_sleep()
+                    random_sleep(reason="Between retry attempts for song metadata")
 
                 result_str = api.parse_song(song_id, try_quality_level)
 
@@ -443,7 +428,6 @@ def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> dict:
 
                     # Replace url using Next Music Tool
                     next_music_tool = NextMusicTool()
-                    # next_music_tool = NextMusicTool(token=NEXT_MUSIC_TOKEN)
                     response = next_music_tool.get_song_url(song_id, try_quality_level)
                     result_json['data']['url'] = response.get('data', {}).get('url')
                     result_json['data']['level'] = response.get('data', {}).get('level')
@@ -899,7 +883,7 @@ def download_song_and_resources(
 
     # Download music file
     logger.info("Downloading music file...")
-    random_sleep()
+    random_sleep(reason="Before downloading music file")
     try:
         response = requests.get(download_url, stream=True, timeout=config.get_timeout())
         response.raise_for_status()
@@ -947,7 +931,7 @@ def download_song_and_resources(
     cover_url = data.get('pic', '')
     if cover_url and config.should_write_cover():
         logger.info("Downloading cover...")
-        random_sleep()
+        random_sleep(reason="Before downloading cover image")
         try:
             cover_response = requests.get(f"{cover_url}?param=320x320", timeout=10)
             cover_response.raise_for_status()
@@ -1060,7 +1044,7 @@ def prepare_album_folder(album_metadata: dict, download_dir: str | None = None) 
             cover_file_path = os.path.join(album_folder_path, 'cover.jpg')
             try:
                 logger.info("Downloading album cover...")
-                random_sleep()
+                random_sleep(reason="Before downloading album cover")
                 cover_response = requests.get(album_cover_url, timeout=10)
                 cover_response.raise_for_status()
 
@@ -1133,7 +1117,6 @@ def download_playlist(playlist_id: str, index_ids: list, level: str = "lossless"
             download_song_and_resources(metadata, idx=None)
         index += 1
 
-NEXT_MUSIC_TOKEN = "59e2b0fa43bb7733b4ae62487f108144"
 
 if __name__ == "__main__":
     # Part-1 Download Song by Song ID
@@ -1142,10 +1125,10 @@ if __name__ == "__main__":
 
     indexes = []
     # indexes = [4, 6, 15, 18, 19]
-    # indexes = list(range(5, 9))
+    # indexes = list(range(11, 13))
 
     # Part-2 Download Songs by Album ID
-    download_album("3085025", indexes)
+    download_album("25610", indexes)
 
     # Part-3 Download Playlist
     # download_playlist("5453912201", indexes)

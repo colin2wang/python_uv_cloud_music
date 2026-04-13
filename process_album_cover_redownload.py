@@ -7,7 +7,8 @@ import imagesize
 import requests
 
 from logging_config import setup_logger
-from process_cloud_music import get_song_ids_by_album_id, random_sleep
+from process_cloud_music import get_song_ids_by_album_id
+from utils import random_sleep
 
 # Create logger
 logger = setup_logger(__name__)
@@ -133,7 +134,7 @@ class AlbumCoverRedownloader:
         """
         try:
             logger.info("Downloading album cover...")
-            random_sleep()
+            random_sleep(reason="Before downloading album cover")
             
             cover_response = requests.get(cover_url, timeout=10)
             cover_response.raise_for_status()

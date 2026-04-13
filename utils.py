@@ -3,12 +3,17 @@ Utility functions for Music Library Organizer
 
 This module provides common utility functions used across the project.
 """
-
+import random
 import re
+import time
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 
 from config_manager import config
+from logging_config import setup_logger
+
+# Create logger for utils module
+logger = setup_logger(__name__)
 
 # Supported audio formats
 AUDIO_EXTENSIONS = {'.mp3', '.mp2', '.mp1', '.flac', '.m4a', '.mp4', '.aac'}
@@ -227,3 +232,18 @@ def safe_get(dictionary: dict, *keys, default=None):
         else:
             return default
     return current
+
+
+def random_sleep(max_delay: float = None, reason: str = "General rate limiting"):
+    """
+    Add random delay to avoid frequent requests
+
+    Args:
+        max_delay: Maximum delay in seconds (default: from config)
+        reason: Reason for the delay (for logging purposes)
+    """
+    if max_delay is None:
+        max_delay = config.get_random_delay_max()
+    delay = random.uniform(1.0, max_delay)
+    logger.info(f"Sleeping for {delay:.2f} seconds... ({reason})")
+    time.sleep(delay)
