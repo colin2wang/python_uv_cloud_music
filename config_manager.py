@@ -117,7 +117,8 @@ class ConfigManager:
                 'write_metadata': True,
                 'write_cover': True,
                 'write_lyrics': True,
-                'max_lyric_length': 1000
+                'max_lyric_length': 1000,
+                'use_next_music_tool': False
             },
             'network': {
                 'timeout': 30,
@@ -227,6 +228,10 @@ class ConfigManager:
     def get_max_lyric_length(self) -> int:
         """Get maximum lyric length"""
         return self.get('metadata.max_lyric_length', 1000)
+    
+    def should_use_next_music_tool(self) -> bool:
+        """Check if NextMusicTool should be used to replace song URL"""
+        return self.get('metadata.use_next_music_tool', False)
     
     def get_timeout(self) -> int:
         """Get network timeout in seconds"""

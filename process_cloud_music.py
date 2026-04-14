@@ -426,12 +426,14 @@ def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> dict:
                 try:
                     result_json = json.loads(result_str)
 
-                    # Replace url using Next Music Tool
-                    next_music_tool = NextMusicTool()
-                    response = next_music_tool.get_song_url(song_id, try_quality_level)
-                    result_json['data']['url'] = response.get('data', {}).get('url')
-                    result_json['data']['level'] = response.get('data', {}).get('level')
-                    result_json['data']['size'] = response.get('data', {}).get('size')
+                    # Replace url using Next Music Tool if configured
+                    if config.should_use_next_music_tool():
+                        logger.info("Replacing song URL with NextMusicTool...")
+                        next_music_tool = NextMusicTool()
+                        response = next_music_tool.get_song_url(song_id, try_quality_level)
+                        result_json['data']['url'] = response.get('data', {}).get('url')
+                        result_json['data']['level'] = response.get('data', {}).get('level')
+                        result_json['data']['size'] = response.get('data', {}).get('size')
 
                     if result_json.get('status') == 200 and result_json.get('data', {}).get('url'):
                         # Set result first
@@ -1121,14 +1123,14 @@ def download_playlist(playlist_id: str, index_ids: list, level: str = "lossless"
 if __name__ == "__main__":
     # Part-1 Download Song by Song ID
     # https://music.163.com/song?id=2052368104
-    # download_song("1329392980")
+    # download_song("1859245776")
 
     indexes = []
     # indexes = [4, 6, 15, 18, 19]
     # indexes = list(range(11, 13))
 
     # Part-2 Download Songs by Album ID
-    download_album("30480", indexes)
+    download_album("21388", indexes)
 
     # Part-3 Download Playlist
     # download_playlist("5453912201", indexes)
