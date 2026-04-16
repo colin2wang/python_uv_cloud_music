@@ -394,8 +394,8 @@ def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> dict:
 
         try_quality_level = config.get_default_quality()
 
-        # Use default quality from config if not specified
-        if level is None:
+        # Use provided quality level if specified, otherwise use default from config
+        if level is not None:
             try_quality_level = level
 
         # Get max retries from config
@@ -454,13 +454,13 @@ def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> dict:
                     else:
                         error_msg = result_json.get('data', {}).get('msg', 'Unknown reason')
                         logger.warning(
-                            f"Quality {try_quality_level} not available (attempt {retry_count + 1}): {error_msg}")
-                        # Retry for temporary failures, but not for permanent unavailability
-                        if retry_count < max_retries:
-                            retry_count += 1
+                            f"Quality {try_quality_level} not available (attempt {retry_count + 1}/{max_retries}): {error_msg}")
+                        # Retry for temporary failures
+                        retry_count += 1
+                        if retry_count <= max_retries:
                             continue
                         else:
-                            # Max retries reached, move to next quality level
+                            # Max retries reached
                             break
                 except json.JSONDecodeError:
                     logger.error(f"Quality {try_quality_level} parsing failed (attempt {retry_count + 1})")
@@ -1095,6 +1095,7 @@ def download_album(album_id: str, index_ids: list, level: str = "lossless"):
     album_artist = album_metadata['album_artist']
     album_name = album_metadata['album_name']
     logger.info(f"Completed downloading album: {album_artist} - {album_name}")
+    logger.info(f"Total downloaded: {index}")
 
 
 def download_playlist(playlist_id: str, index_ids: list, level: str = "lossless"):
@@ -1118,19 +1119,20 @@ def download_playlist(playlist_id: str, index_ids: list, level: str = "lossless"
             metadata = get_song_metadata_by_song_id(song_id, level)
             download_song_and_resources(metadata, idx=None)
         index += 1
+    logger.info(f"Total downloaded: {index}")
 
 
 if __name__ == "__main__":
     # Part-1 Download Song by Song ID
     # https://music.163.com/song?id=2052368104
-    # download_song("1859245776")
+    # download_song("1410416506")
 
     indexes = []
     # indexes = [4, 6, 15, 18, 19]
     # indexes = list(range(11, 13))
 
     # Part-2 Download Songs by Album ID
-    download_album("21388", indexes)
+    download_album("288782371", indexes)
 
     # Part-3 Download Playlist
     # download_playlist("5453912201", indexes)
