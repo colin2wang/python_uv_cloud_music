@@ -415,7 +415,7 @@ def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> dict:
         retry_count = 0
         success = False
 
-        while retry_count < max_retries and not success:
+        while retry_count <= max_retries and not success:
             try:
                 if retry_count > 0:
                     logger.info(f"Retry {retry_count}/{max_retries} for quality {try_quality_level}...")
@@ -452,7 +452,14 @@ def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> dict:
                         success = True
                         break
                     else:
-                        error_msg = result_json.get('data', {}).get('msg', 'Unknown reason')
+                        error_msg = 'Unknown reason'
+                        # 第一个取值位置
+                        if result_json.get('data', {}).get('msg'):
+                            error_msg = result_json['data']['msg']
+                        # 第二个取值位置
+                        elif result_json.get('message'):
+                            error_msg = result_json['message']
+
                         logger.warning(
                             f"Quality {try_quality_level} not available (attempt {retry_count + 1}/{max_retries}): {error_msg}")
                         # Retry for temporary failures
@@ -1124,15 +1131,15 @@ def download_playlist(playlist_id: str, index_ids: list, level: str = "lossless"
 
 if __name__ == "__main__":
     # Part-1 Download Song by Song ID
-    # https://music.163.com/song?id=2052368104
-    # download_song("1410416506")
+    # https://music.163.com/song?id=
+    # download_song("2052368104")
 
     indexes = []
     # indexes = [4, 6, 15, 18, 19]
     # indexes = list(range(11, 13))
 
     # Part-2 Download Songs by Album ID
-    download_album("288782371", indexes)
+    download_album("34881446", indexes)
 
     # Part-3 Download Playlist
     # download_playlist("5453912201", indexes)
