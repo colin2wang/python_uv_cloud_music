@@ -1132,14 +1132,14 @@ def download_playlist(playlist_id: str, index_ids: list, level: str = "lossless"
 if __name__ == "__main__":
     # Part-1 Download Song by Song ID
     # https://music.163.com/song?id=
-    # download_song("2052368104")
+    # download_song("2163629816")
 
     indexes = []
     # indexes = [4, 6, 15, 18, 19]
     # indexes = list(range(11, 13))
 
     # Part-2 Download Songs by Album ID
-    download_album("34881446", indexes)
+    download_album("1505850", indexes)
 
     # Part-3 Download Playlist
     # download_playlist("5453912201", indexes)
