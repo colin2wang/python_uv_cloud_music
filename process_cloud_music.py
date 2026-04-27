@@ -1048,6 +1048,39 @@ def prepare_album_folder(album_metadata: dict, download_dir: str | None = None) 
         except Exception as e:
             logger.error(f"Failed to create description file: {str(e)}")
 
+        # Create album ID file with song names and IDs
+        if album_id:
+            album_id_file_path = os.path.join(album_folder_path, f"{album_id}.txt")
+            try:
+                # Get song details from raw data
+                song_details = []
+                try:
+                    songs_data = raw_data.get('data', {}).get('album', {}).get('songs', [])
+                    for song in songs_data:
+                        song_name = song.get('name', 'Unknown')
+                        song_id = song.get('id', '')
+                        if song_id:
+                            song_details.append((song_name, song_id))
+                except (AttributeError, KeyError):
+                    logger.warning(f"Could not extract song details from raw data")
+                
+                with open(album_id_file_path, 'w', encoding='utf-8') as f:
+                    f.write(f"Album ID: {album_id}\n")
+                    f.write(f"Album: {album_name}\n")
+                    f.write(f"Artist: {album_artist}\n")
+                    f.write("\n" + "=" * 60 + "\n")
+                    f.write("Songs:\n\n")
+                    
+                    if song_details:
+                        for idx, (song_name, song_id) in enumerate(song_details, 1):
+                            f.write(f"{idx}. {song_name} (ID: {song_id})\n")
+                    else:
+                        f.write("No song information available\n")
+                
+                logger.info(f"Created album ID file: {os.path.basename(album_id_file_path)}")
+            except Exception as e:
+                logger.error(f"Failed to create album ID file: {str(e)}")
+
         # Download cover image
         if album_cover_url and config.should_write_cover():
             cover_file_path = os.path.join(album_folder_path, 'cover.jpg')

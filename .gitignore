@@ -7,3 +7,6 @@
 # Folders
 downloads/
 logs/
+
+# Last configuration file
+last_config.txt

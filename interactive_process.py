@@ -4,12 +4,55 @@ Provides a user-friendly interface to select download method and input parameter
 """
 
 import sys
+import json
+from pathlib import Path
 
 from logging_config import setup_logger
 from process_cloud_music import download_song, download_album, download_playlist
 
 # Create logger
 logger = setup_logger(__name__)
+
+# Last config file path
+LAST_CONFIG_FILE = Path(__file__).parent / 'last_config.txt'
+
+
+def load_last_config() -> dict:
+    """
+    Load last used configuration from file.
+    
+    Returns:
+        Dictionary containing last configuration values
+    """
+    try:
+        if LAST_CONFIG_FILE.exists():
+            with open(LAST_CONFIG_FILE, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                logger.info(f"Loaded last configuration from {LAST_CONFIG_FILE}")
+                return config
+    except Exception as e:
+        logger.warning(f"Failed to load last config: {e}")
+    
+    # Return default config if file doesn't exist or error occurred
+    return {
+        'method': 1,
+        'quality': 'lossless'
+    }
+
+
+def save_last_config(config: dict):
+    """
+    Save current configuration to file for next use.
+    
+    Args:
+        config: Dictionary containing configuration values to save
+    """
+    try:
+        with open(LAST_CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+        logger.info(f"Saved configuration to {LAST_CONFIG_FILE}")
+    except Exception as e:
+        logger.warning(f"Failed to save last config: {e}")
 
 
 def parse_indexes(input_str: str) -> list:
@@ -94,9 +137,12 @@ def confirm_indexes(indexes: list) -> bool:
             print("Please enter 'yes' or 'no'")
 
 
-def select_download_method() -> int:
+def select_download_method(default_method: int = 1) -> int:
     """
     Display menu and let user select download method.
+    
+    Args:
+        default_method: Default method to suggest (1, 2, or 3)
     
     Returns:
         Selected method number (1, 2, or 3)
@@ -112,8 +158,10 @@ def select_download_method() -> int:
     print("-" * 60)
     
     while True:
-        choice = input("Enter your choice (0-3): ").strip()
-        if choice in ['0', '1', '2', '3']:
+        choice = input(f"Enter your choice (0-3) [{default_method}]: ").strip()
+        if choice == '':
+            return default_method
+        elif choice in ['0', '1', '2', '3']:
             return int(choice)
         else:
             print("Invalid choice. Please enter 0, 1, 2, or 3.")
@@ -124,8 +172,11 @@ def main():
     print("\nWelcome to Cloud Music Interactive Download Tool!")
     
     while True:
+        # Load last configuration at the start of each iteration
+        last_config = load_last_config()
+        
         # Step 1: Select download method
-        method = select_download_method()
+        method = select_download_method(last_config.get('method', 1))
         
         if method == 0:
             print("\nThank you for using Cloud Music Download Tool. Goodbye!")
@@ -133,8 +184,9 @@ def main():
         
         # Step 2: Get ID based on selected method
         if method == 1:
-            resource_id = get_user_input("Enter Song ID (e.g., 2163629816)")
-            quality = get_user_input("Enter quality level", "lossless")
+            last_song_id = last_config.get('song_id', '')
+            resource_id = get_user_input("Enter Song ID (e.g., 2163629816)", last_song_id)
+            quality = get_user_input("Enter quality level", last_config.get('quality', 'lossless'))
             
             print(f"\nStarting download...")
             print(f"Song ID: {resource_id}")
@@ -144,13 +196,21 @@ def main():
             try:
                 download_song(resource_id, quality)
                 print("\n✓ Download completed successfully!")
+                
+                # Save configuration for next use
+                save_last_config({
+                    'method': 1,
+                    'song_id': resource_id,
+                    'quality': quality
+                })
             except Exception as e:
                 logger.error(f"Download failed: {str(e)}")
                 print(f"\n✗ Download failed: {str(e)}")
         
         elif method == 2:
-            resource_id = get_user_input("Enter Album ID (e.g., 172259)")
-            quality = get_user_input("Enter quality level", "lossless")
+            last_album_id = last_config.get('album_id', '')
+            resource_id = get_user_input("Enter Album ID (e.g., 172259)", last_album_id)
+            quality = get_user_input("Enter quality level", last_config.get('quality', 'lossless'))
             
             # Ask if user wants to specify indexes
             want_indexes = input("\nDo you want to download specific tracks only? (yes/no) [no]: ").strip().lower()
@@ -159,6 +219,11 @@ def main():
             if want_indexes in ['yes', 'y']:
                 print("\nEnter track numbers to download (separated by spaces or commas)")
                 print("Example: 1 3 5  or  1,3,5  or  1 3,5")
+                
+                # Show last used indexes as default if available
+                last_indexes = last_config.get('indexes', [])
+                if last_indexes:
+                    print(f"Last used indexes: {last_indexes}")
                 
                 while True:
                     index_input = get_user_input("Enter track numbers")
@@ -183,13 +248,22 @@ def main():
             try:
                 download_album(resource_id, indexes, quality)
                 print("\n✓ Album download completed successfully!")
+                
+                # Save configuration for next use
+                save_last_config({
+                    'method': 2,
+                    'album_id': resource_id,
+                    'quality': quality,
+                    'indexes': indexes
+                })
             except Exception as e:
                 logger.error(f"Download failed: {str(e)}")
                 print(f"\n✗ Download failed: {str(e)}")
         
         elif method == 3:
-            resource_id = get_user_input("Enter Playlist ID (e.g., 5453912201)")
-            quality = get_user_input("Enter quality level", "lossless")
+            last_playlist_id = last_config.get('playlist_id', '')
+            resource_id = get_user_input("Enter Playlist ID (e.g., 5453912201)", last_playlist_id)
+            quality = get_user_input("Enter quality level", last_config.get('quality', 'lossless'))
             
             # Ask if user wants to specify indexes
             want_indexes = input("\nDo you want to download specific tracks only? (yes/no) [no]: ").strip().lower()
@@ -198,6 +272,11 @@ def main():
             if want_indexes in ['yes', 'y']:
                 print("\nEnter track numbers to download (separated by spaces or commas)")
                 print("Example: 1 3 5  or  1,3,5  or  1 3,5")
+                
+                # Show last used indexes as default if available
+                last_indexes = last_config.get('indexes', [])
+                if last_indexes:
+                    print(f"Last used indexes: {last_indexes}")
                 
                 while True:
                     index_input = get_user_input("Enter track numbers")
@@ -222,6 +301,14 @@ def main():
             try:
                 download_playlist(resource_id, indexes, quality)
                 print("\n✓ Playlist download completed successfully!")
+                
+                # Save configuration for next use
+                save_last_config({
+                    'method': 3,
+                    'playlist_id': resource_id,
+                    'quality': quality,
+                    'indexes': indexes
+                })
             except Exception as e:
                 logger.error(f"Download failed: {str(e)}")
                 print(f"\n✗ Download failed: {str(e)}")
