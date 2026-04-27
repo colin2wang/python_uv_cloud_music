@@ -1,13 +1,13 @@
 # Music Library Organizer
 
-A powerful Python-based tool for organizing, downloading, and managing your digital music library with automatic metadata tagging and cover art embedding.
+A powerful Python-based tool for organizing, downloading, and managing your digital music library with automatic metadata tagging, cover art embedding, and interactive download interface.
 
 ## Features
 
 - **Multi-format Support**: Works with MP3, FLAC, M4A, AAC, and other popular audio formats
-- **Automatic Metadata Tagging**: Embeds title, artist, album, track number, year, and lyrics directly into audio files
+- **Automatic Metadata Tagging**: Embeds title, artist, album, track number, year, lyrics, and NetEase Cloud Music ID directly into audio files
 - **Cover Art Integration**: Automatically downloads and embeds high-quality album artwork (320x320)
-- **Lyrics Download**: Saves synchronized lyrics files alongside your music
+- **Lyrics Download**: Saves synchronized lyrics files (.lrc) alongside your music
 - **Playlist Management**: Extract and download entire playlists with a single command
 - **Album Processing**: Download complete albums with proper track ordering, metadata, and dedicated album folders
 - **Smart Search**: Find songs by keyword and preview before downloading
@@ -17,6 +17,10 @@ A powerful Python-based tool for organizing, downloading, and managing your digi
 - **Album Folder Organization**: Creates structured album folders with description files and cover art
 - **Folder Utilities**: Built-in tools for processing existing music libraries in batch
 - **Configurable Behavior**: YAML-based configuration for customization without code changes
+- **Interactive Mode**: User-friendly interactive interface for easy song/album/playlist downloads
+- **Smart Retry Logic**: Automatic retry mechanism for failed API requests with configurable attempts
+- **NextMusicTool Integration**: Optional integration with NextMusicTool for enhanced URL resolution
+- **Progress Tracking**: Real-time progress display with estimated completion time for batch operations
 
 ## Installation
 
@@ -29,7 +33,7 @@ A powerful Python-based tool for organizing, downloading, and managing your digi
 
 Using pip:
 ```bash
-pip install requests mutagen pyyaml
+pip install requests mutagen pyyaml imagesize
 ```
 
 Or using uv (recommended):
@@ -38,6 +42,22 @@ uv sync
 ```
 
 ## Quick Start
+
+### Interactive Mode (Recommended)
+
+The easiest way to use the tool is through the interactive interface:
+
+```bash
+python interactive_process.py
+```
+
+This will guide you through:
+- Selecting download method (single song, album, or playlist)
+- Entering resource IDs
+- Choosing quality level
+- Specifying which tracks to download (for albums/playlists)
+
+Your preferences are automatically saved for next time!
 
 ### Download a Single Song
 
@@ -74,7 +94,7 @@ download_playlist("11223344", index_ids=[1, 3, 5], level="lossless")
 
 ## Configuration
 
-## Configuration Reference
+All settings are managed through `config.yml`. The tool loads configuration automatically on startup.
 
 ### Complete Configuration Options
 
@@ -105,12 +125,14 @@ metadata:
   write_cover: true                     # Embed cover art
   write_lyrics: true                    # Save and embed lyrics
   max_lyric_length: 1000                # Maximum lyric length
+  use_next_music_tool: false            # Use NextMusicTool for URL resolution
 
 # Network Configuration
 network:
   timeout: 30                           # Request timeout in seconds
   random_delay_max: 2.5                 # Max random delay between requests
   api_delay_min: 1.0                    # Minimum delay between API calls
+  max_retries: 1                        # Number of retries for failed requests
 
 # Logging Configuration
 logging:
@@ -140,18 +162,9 @@ Available variables for customizing filename patterns:
 - **jyeffect**: HD surround sound - Enhanced stereo
 - **jymaster**: Ultra-clear master - Studio master quality
 
-### Quality Levels
+The system includes smart retry logic that automatically tries alternative quality levels if the preferred level is unavailable.
 
-The tool supports multiple quality tiers:
-- `lossless` - Highest quality FLAC/WAV (default)
-- `hires` - Hi-Res quality
-- `exhigh` - High quality (320kbps)
-- `sky` - Immersive surround sound
-- `jyeffect` - HD surround sound
-- `jymaster` - Ultra-clear master
-- `standard` - Standard quality (128kbps)
 
-The system will automatically fall back to lower qualities if the preferred level is unavailable.
 
 ### Output Structure
 
@@ -266,6 +279,41 @@ Download song and all related resources (lyrics, cover art) with metadata embedd
 
 ## Advanced Usage
 
+### Interactive Download Tool
+
+Use the interactive mode for a user-friendly experience:
+
+```bash
+python interactive_process.py
+```
+
+Features:
+- Menu-driven interface for selecting download type
+- Remembers your last used settings
+- Supports selective track downloads for albums/playlists
+- Input validation and confirmation
+- Progress tracking and error handling
+
+Example session:
+```
+Welcome to Cloud Music Interactive Download Tool!
+
+Please select download method:
+1. Download single song by Song ID
+2. Download album by Album ID
+3. Download playlist by Playlist ID
+0. Exit
+
+Enter your choice [1]: 2
+Enter Album ID: 361790100
+Enter quality level [lossless]: 
+Enter track numbers to download (or press Enter for all): 1,3,5
+
+Parsed indexes: [1, 3, 5]
+Total count: 3
+Are these indexes correct? (yes/no) [yes]: yes
+```
+
 ### Custom API Endpoint
 
 You can configure a custom API endpoint in `config.yml`:
@@ -287,11 +335,15 @@ api = MusicToolAPI(base_url="https://your-custom-api.com")
 The tool includes utilities for processing existing music folder structures:
 
 ```python
-from process_from_folders import process_folders, iterate_folders
+from process_from_folders import process_folders, iterate_folders, list_folders
 from process_album_lyrics_fix import fix_album_lyrics
 from process_album_cover_redownload import redownload_album_cover
 
-# Process all album folders in a directory
+# List all album folders in a directory
+folders = list_folders("J:\\Music")
+print(f"Found {len(folders)} albums")
+
+# Process all album folders with a specific function
 results = process_folders(
     "J:\\Music",
     fix_album_lyrics,
@@ -299,14 +351,57 @@ results = process_folders(
     stop_on_error=False
 )
 
-# Or iterate manually
+# Or iterate manually for custom processing
 for folder in iterate_folders("J:\\Music"):
     redownload_album_cover(folder)
 ```
 
+Available utility functions:
+- **list_folders()**: Get sorted list of all subdirectories
+- **iterate_folders()**: Iterator for memory-efficient folder processing
+- **process_folders()**: Batch process with progress tracking and error handling
+- **fix_album_lyrics()**: Fix and update lyrics for existing albums
+- **redownload_album_cover()**: Re-download and embed album covers
+
 ### Error Handling
 
 All functions include comprehensive error handling and logging. Failed downloads are logged but don't interrupt batch processing.
+
+### Smart Retry Mechanism
+
+The tool implements intelligent retry logic for API requests:
+
+```python
+from process_cloud_music import get_song_metadata_by_song_id
+
+# Automatically retries up to configured max_retries times
+metadata = get_song_metadata_by_song_id("12345678", level="lossless")
+
+# Retries help handle:
+# - Temporary network failures
+# - API rate limiting
+# - Quality level unavailability
+# - Server-side errors
+```
+
+Configure retry behavior in `config.yml`:
+```yaml
+network:
+  max_retries: 1              # Number of retry attempts
+  random_delay_max: 2.5       # Random delay between requests
+  api_delay_min: 1.0          # Minimum delay between API calls
+```
+
+### NextMusicTool Integration
+
+Optionally integrate with NextMusicTool for enhanced URL resolution:
+
+```yaml
+metadata:
+  use_next_music_tool: true   # Enable NextMusicTool integration
+```
+
+When enabled, the tool will use NextMusicTool to resolve song URLs, which may provide better availability or quality options.
 
 ### Logging
 
@@ -318,9 +413,9 @@ Logs are saved to the `logs/` directory with automatic rotation and archiving.
 
 ### Supported Metadata Formats
 
-- **ID3 Tags** (MP3): TIT2 (title), TPE1 (artist), TALB (album), TRCK (track), TYER (year), APIC (cover), COMM (lyrics)
-- **Vorbis Comments** (FLAC): TITLE, ARTIST, ALBUM, TRACKNUMBER, LYRICS
-- **MP4 Tags** (M4A/AAC): ©nam, ©ART, ©alb, trkn, ©lyr, covr
+- **ID3 Tags** (MP3): TIT2 (title), TPE1 (artist), TALB (album), TRCK (track), TYER (year), APIC (cover), COMM (lyrics), TXXX (NetEase Cloud Music ID)
+- **Vorbis Comments** (FLAC): TITLE, ARTIST, ALBUM, TRACKNUMBER, LYRICS, CMUSIC_ID
+- **MP4 Tags** (M4A/AAC): ©nam, ©ART, ©alb, trkn, ©lyr, covr, ----:CMUSIC_ID
 
 ### File Naming Convention
 
@@ -335,21 +430,24 @@ Special characters are automatically replaced with underscores to ensure cross-p
 
 ```
 .
-├── process_cloud_music.py        # Main processing logic and API client
-├── process_from_folders.py       # Folder listing and batch processing utilities
-├── process_album_cover_redownload.py  # Album cover re-download utility
-├── process_album_lyrics_fix.py   # Lyrics correction utility
-├── config_manager.py             # Configuration management
-├── config.yml                    # YAML configuration file
-├── logging_config.py             # Logging configuration
-├── utils.py                      # Utility functions
-├── pyproject.toml                # Project dependencies
-├── api_docs/                     # API documentation
+├── process_cloud_music.py              # Main processing logic and API client
+├── interactive_process.py              # Interactive download interface
+├── process_from_folders.py             # Folder listing and batch processing utilities
+├── process_album_cover_redownload.py   # Album cover re-download utility
+├── process_album_lyrics_fix.py         # Lyrics correction utility
+├── process_album_metadata_fix.py       # Album metadata correction utility
+├── config_manager.py                   # Configuration management
+├── config.yml                          # YAML configuration file
+├── logging_config.py                   # Logging configuration
+├── utils.py                            # Utility functions
+├── tool_next_music.py                  # NextMusicTool integration
+├── pyproject.toml                      # Project dependencies
+├── api_docs/                           # API documentation
 │   ├── get_song.md
 │   ├── get_album.md
 │   └── get_playlist.md
-├── logs/                         # Log files
-└── downloads/                    # Default download directory
+├── logs/                               # Log files
+└── downloads/                          # Default download directory
 ```
 
 ## Limitations
@@ -364,15 +462,40 @@ Special characters are automatically replaced with underscores to ensure cross-p
 
 **Issue: "No available quality"**
 - The requested song may not be available in any quality level
-- Try a different song or check if the ID is correct
+- Try a different quality level (e.g., "exhigh" instead of "lossless")
+- Check if the song ID is correct
+- The song may have been removed from the platform
 
 **Issue: "JSON parsing failed"**
 - Network connectivity issues
 - API endpoint may be temporarily unavailable
+- Check your internet connection
+- Try again after a few moments (the tool has built-in retry logic)
 
 **Issue: "Metadata writing failed"**
 - File format may not support metadata embedding
 - Check file permissions in the download directory
+- Ensure the file is not open in another application
+- Some DRM-protected files cannot be modified
+
+**Issue: Slow download speed**
+- Check your internet connection
+- The source server may be experiencing high load
+- Try downloading during off-peak hours
+- Consider using a lower quality level for faster downloads
+
+**Issue: Missing lyrics or cover art**
+- Not all songs have lyrics or cover art available
+- The API may not return this information for some tracks
+- Check the logs for specific error messages
+
+### Getting Help
+
+If you encounter issues:
+1. Check the log files in the `logs/` directory
+2. Verify your configuration in `config.yml`
+3. Ensure you're using the latest version of dependencies
+4. Review the API documentation in `api_docs/`
 
 ## Contributing
 
