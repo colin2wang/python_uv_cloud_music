@@ -315,8 +315,8 @@ def main():
         
         # Ask if user wants to continue
         print("\n" + "=" * 60)
-        again = input("Do you want to download more? (yes/no) [no]: ").strip().lower()
-        if again not in ['yes', 'y']:
+        again = input("Do you want to download more? (yes/no) [yes]: ").strip().lower()
+        if again in ['no', 'n']:
             print("\nThank you for using Cloud Music Download Tool. Goodbye!")
             break
 
