@@ -842,7 +842,9 @@ def _build_filename(song_name: str, artist: str, idx: int | None) -> str:
 def download_song_and_resources(
     song_metadata: dict,
     download_dir: str | None = None,
-    idx: int | None = None
+    idx: int | None = None,
+    current_index: int | None = None,
+    total_count: int | None = None
 ) -> bool:
     """
     Download song file and related resources (lyrics, cover).
@@ -851,6 +853,8 @@ def download_song_and_resources(
         song_metadata: Song metadata dictionary
         download_dir: Download directory path
         idx: Track index for filename
+        current_index: Current song index (for progress display)
+        total_count: Total number of songs (for progress display)
 
     Returns:
         bool: Whether download was successful
@@ -885,7 +889,12 @@ def download_song_and_resources(
         logger.info(f"File already exists, skipping: {music_file_path.name}")
         return True
 
-    logger.info(f"Starting download: {filename}")
+    # Build progress info
+    progress_info = ""
+    if current_index is not None and total_count is not None:
+        progress_info = f"[{current_index} / {total_count}] "
+    
+    logger.info(f"{progress_info}Starting download: {filename}")
     logger.info(f"File size: {data.get('size', 'Unknown')}")
     logger.info(f"Quality: {song_metadata.get('used_quality', data.get('level', 'unknown'))}")
     logger.info("-" * 60)
@@ -1052,17 +1061,8 @@ def prepare_album_folder(album_metadata: dict, download_dir: str | None = None) 
         if album_id:
             album_id_file_path = os.path.join(album_folder_path, f"{album_id}.txt")
             try:
-                # Get song details from raw data
-                song_details = []
-                try:
-                    songs_data = raw_data.get('data', {}).get('album', {}).get('songs', [])
-                    for song in songs_data:
-                        song_name = song.get('name', 'Unknown')
-                        song_id = song.get('id', '')
-                        if song_id:
-                            song_details.append((song_name, song_id))
-                except (AttributeError, KeyError):
-                    logger.warning(f"Could not extract song details from raw data")
+                # Get song details from album_metadata (already contains complete information)
+                song_details = album_metadata.get('song_details', [])
                 
                 with open(album_id_file_path, 'w', encoding='utf-8') as f:
                     f.write(f"Album ID: {album_id}\n")
@@ -1072,8 +1072,12 @@ def prepare_album_folder(album_metadata: dict, download_dir: str | None = None) 
                     f.write("Songs:\n\n")
                     
                     if song_details:
-                        for idx, (song_name, song_id) in enumerate(song_details, 1):
-                            f.write(f"{idx}. {song_name} (ID: {song_id})\n")
+                        for song_detail in song_details:
+                            idx = song_detail.get('index', 0)
+                            song_name = song_detail.get('name', 'Unknown')
+                            song_id = song_detail.get('id', '')
+                            song_artists = song_detail.get('artists', 'Unknown Artist')
+                            f.write(f"{idx}. {song_name} - {song_artists} (ID: {song_id})\n")
                     else:
                         f.write("No song information available\n")
                 
@@ -1124,12 +1128,12 @@ def download_album(album_id: str, index_ids: list, level: str = "lossless"):
             if song_index in index_ids:
                 logger.info(f"{song_index} is in the {index_ids}, continue downloading...")
                 metadata = get_song_metadata_by_song_id(song_id, level)
-                download_song_and_resources(metadata, idx=song_index)
+                download_song_and_resources(metadata, idx=song_index, current_index=index + 1, total_count=len(album_metadata['song_ids']))
             else:
                 logger.info(f"{song_index} is not in the {index_ids}, skipping downloading...")
         else:
             metadata = get_song_metadata_by_song_id(song_id, level)
-            download_song_and_resources(metadata, idx=song_index)
+            download_song_and_resources(metadata, idx=song_index, current_index=index + 1, total_count=len(album_metadata['song_ids']))
         index += 1
 
     album_artist = album_metadata['album_artist']
@@ -1152,12 +1156,12 @@ def download_playlist(playlist_id: str, index_ids: list, level: str = "lossless"
             if song_index in index_ids:
                 logger.info(f"{song_index} is in the {index_ids}, continue downloading...")
                 metadata = get_song_metadata_by_song_id(song_id, level)
-                download_song_and_resources(metadata, idx=None)
+                download_song_and_resources(metadata, idx=None, current_index=index + 1, total_count=len(playlist_metadata['song_ids']))
             else:
                 logger.info(f"{song_index} is not in the {index_ids}, skipping downloading...")
         else:
             metadata = get_song_metadata_by_song_id(song_id, level)
-            download_song_and_resources(metadata, idx=None)
+            download_song_and_resources(metadata, idx=None, current_index=index + 1, total_count=len(playlist_metadata['song_ids']))
         index += 1
     logger.info(f"Total downloaded: {index}")
 
