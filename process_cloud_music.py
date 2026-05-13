@@ -432,6 +432,7 @@ def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> dict:
                         next_music_tool = NextMusicToolV2()
                         song_info_response = next_music_tool.get_song_info(song_id)
                         song_url_response = next_music_tool.get_song_url(song_id, try_quality_level)
+                        song_lyric_response = next_music_tool.get_song_lyric(song_id)
                         
                         # Check if song_url_response is valid
                         if (song_url_response and song_info_response and isinstance(song_url_response, dict)
@@ -451,6 +452,18 @@ def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> dict:
                                 'id': song_info_data.get('id'),
                                 'duration': song_info_data.get('duration')
                             }
+                            
+                            # Add lyrics if available
+                            if song_lyric_response and isinstance(song_lyric_response, dict):
+                                lyric_data = song_lyric_response.get('data', {})
+                                if lyric_data and 'lrc' in lyric_data:
+                                    result_json['data']['lyric'] = lyric_data['lrc']
+                                    logger.info(f"Lyrics retrieved successfully for song {song_id}")
+                                else:
+                                    logger.warning(f"No lyrics found for song {song_id}")
+                            else:
+                                logger.warning(f"Failed to retrieve lyrics for song {song_id}")
+                            
                             result_json['status'] = song_url_response.get('code')
                         else:
                             logger.error("NextMusicTool returned invalid song_url_response")
@@ -572,7 +585,7 @@ def _write_mp3_metadata(audio_file: ID3, metadata: dict) -> None:
     # NetEase Cloud Music Song ID
     if song_id:
         from mutagen.id3 import TXXX
-        audio_file.add(TXXX(encoding=3, desc='CMUSIC_ID', text=song_id))
+        audio_file.add(TXXX(encoding=3, desc='CMUSIC_ID', text=str(song_id)))
 
     # Comments (lyrics)
     # Note: Use encoding=1 (UTF-16 with BOM) to properly preserve newlines in lyrics
@@ -616,7 +629,8 @@ def _write_flac_metadata(audio_file: FLAC, metadata: dict) -> None:
     if track_number:
         audio_file['TRACKNUMBER'] = track_number
     if song_id:
-        audio_file['CMUSIC_ID'] = song_id
+        # Ensure song_id is a string
+        audio_file['CMUSIC_ID'] = str(song_id)
 
     # Add cover
     if cover_path and os.path.exists(cover_path):
@@ -656,7 +670,8 @@ def _write_mp4_metadata(audio_file: MP4, metadata: dict) -> None:
     if track_number:
         mp4_tags['trkn'] = [(int(track_number), 0)]
     if song_id:
-        mp4_tags['----:CMUSIC_ID'] = song_id.encode('utf-8')
+        # Ensure song_id is a string before encoding
+        mp4_tags['----:CMUSIC_ID'] = str(song_id).encode('utf-8')
 
     # Add cover
     if cover_path and os.path.exists(cover_path):

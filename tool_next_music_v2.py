@@ -123,6 +123,66 @@ class NextMusicToolV2:
         logger.error(f"All retries failed, last error: {str(last_error)}")
         return None
 
+    def get_song_lyric(self, song_id: str, max_retries: int = MAX_RETRY):
+        """Get song lyric from NextMusic API with retry mechanism"""
+        last_error = None
+        
+        for attempt in range(1, max_retries + 1):
+            try:
+                random_sleep(3.0, reason="Next Music Tool fetching song lyric")
+                logger.info(f"Attempt {attempt}/{max_retries} - Fetching session key...")
+                # impersonate="chrome120" is the key! It makes the website firewall think this is a real Chrome browser request
+                key_res = requests.post("https://nextmusic.toubiec.cn/api/key", headers=HEADERS, impersonate="chrome120")
+                key_res.raise_for_status()
+
+                key_info = key_res.json().get('data', {})
+                key_id = key_info.get('keyId')
+                key_token = key_info.get('keyToken')
+                aes_key = key_info.get('key')
+                logger.info(f"   [Success] Got KeyId: {key_id}")
+
+                logger.info(f"\nRequesting song lyric (SongID: {song_id})...")
+                lyric_payload = {
+                    "id": song_id
+                }
+
+                request_body = {
+                    "keyId": key_id,
+                    "keyToken": key_token,
+                    "data": self.encrypt_payload(lyric_payload, aes_key)
+                }
+
+                logger.debug(json.dumps(request_body, indent=2))
+                lyric_res = requests.post("https://nextmusic.toubiec.cn/api/getSongLyric", json=request_body, headers=HEADERS,
+                                         impersonate="chrome120")
+                logger.debug(lyric_res.text)
+                lyric_res.raise_for_status()
+                response_json = lyric_res.json()
+
+                if 'ciphertext' in response_json:
+                    logger.info("\nServer returned ciphertext, decrypting...")
+                    decrypted_data = self.decrypt_response(response_json['ciphertext'], aes_key)
+                    logger.info("\n==== Decryption Result ====")
+                    logger.info(json.dumps(decrypted_data, indent=4, ensure_ascii=False))
+                    return decrypted_data
+                else:
+                    logger.info("\n==== Parsing Result (Unencrypted) ====")
+                    logger.info(json.dumps(response_json, indent=4, ensure_ascii=False))
+                    return response_json
+                
+            except Exception as e:
+                last_error = e
+                logger.error(f"Attempt {attempt}/{max_retries} failed: {str(e)}")
+                if attempt < max_retries:
+                    wait_time = round(random.uniform(10, 20), 1)  # Random between 10-20 seconds, precise to 0.1s
+                    logger.info(f"Waiting {wait_time} seconds before retry...")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"Maximum retry count reached ({max_retries})")
+        
+        logger.error(f"All retries failed, last error: {str(last_error)}")
+        return None
+
     def get_song_url(self, song_id: str, level: str = "lossless", max_retries: int = MAX_RETRY):
         """Get song URL from NextMusic API with retry mechanism"""
         last_error = None
@@ -195,6 +255,9 @@ if __name__ == "__main__":
 
     # Get song URL (use standard quality as default safe test)
     song_id = 26427662
-    tool.get_song_info(song_id)
-    tool.get_song_url(song_id, level="standard")
+    result_1 = tool.get_song_info(song_id)
+    result_2 = tool.get_song_lyric(song_id)  # Test the new lyric method
+    result_3 = tool.get_song_url(song_id, level="standard")
+
+    print(result_1, result_2, result_3)
 

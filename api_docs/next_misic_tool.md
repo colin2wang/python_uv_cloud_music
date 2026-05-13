@@ -59,7 +59,36 @@ curl 'https://nextmusic.toubiec.cn/api/getSongUrl' \
   -H 'sec-fetch-site: same-site' \
   -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36' \
   --data-raw '{"keyId":"343d6fa3-7238-4a7e-9e00-78b47228144c","keyToken":"f3377da5-e8f1-42b5-9803-5c83fba59406","data":"IbrEVoGs6x74aGDe.hfZm4LjTdRIG+yyQ2iCmbg==.pp5PYs8cogvf1GSqgN3fXiBl7d6LotZjkjMBKNBbyKwXRR203RdPAyBiYwrBmPEuhENkZjuYy/y3GGfGdBi2gg=="}'
-  ```
+```
+
+## Call#4 POST getSongLyric
+```bash
+curl 'https://nextmusic.toubiec.cn/api/getSongLyric' \
+  -H 'accept: */*' \
+  -H 'accept-language: zh-CN,zh;q=0.9' \
+  -H 'content-type: application/json' \
+  -H 'origin: https://wyapi.toubiec.cn' \
+  -H 'priority: u=1, i' \
+  -H 'sec-ch-ua: "Not A(Brand";v="8", "Chromium";v="132", "Google Chrome";v="132"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "Windows"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-site' \
+  -H 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36' \
+  --data-raw '{"keyId":"89c4fb39-c3ea-449b-b750-95e947bde389","keyToken":"6291b52c-3b39-42a2-91ee-4c3757441288","data":"bQwk2qFKipdoh6b8.rbqW46swu/NnBduG5ZmOoQ==.bqZGrPkXUwD3C8Jo7aDvLH1Txki/NQkRBh7/w2J5J62VeyRVp2x1MQSiratn"}'
+
+# 响应示例（解密后）
+{
+    "code": 200,
+    "data": {
+        "lrc": "[00:00.000] 作词 : ...\n[00:01.000] 作曲 : ...",
+        "tlyric": "",
+        "romalrc": "",
+        "klyric": ""
+    }
+}
+```
 
 ## 方法 单曲逻辑
 ```javascript
