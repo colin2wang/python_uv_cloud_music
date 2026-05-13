@@ -10,6 +10,7 @@ dependencies = [
     "imagesize>=1.4.0",
     "pycryptodome>=3.23.0",
     "cryptography>=42.0.0",
+    "curl-cffi>=0.15.0",
 ]
 
 [[tool.uv.index]]

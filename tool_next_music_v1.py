@@ -181,8 +181,8 @@ class NextMusicTool:
             
             logger.debug(f"Decoded - IV: {len(iv)}, Tag: {len(tag)}, Ciphertext: {len(ciphertext)}")
             
-            # Combine tag + ciphertext (as in JS code)
-            ciphertext_with_tag = tag + ciphertext
+            # Combine ciphertext + tag (NOT tag + ciphertext!)
+            ciphertext_with_tag = ciphertext + tag
             logger.debug(f"Combined ciphertext+tag length: {len(ciphertext_with_tag)}")
             
             # Decrypt using AES-GCM
@@ -209,14 +209,20 @@ class NextMusicTool:
             API response as dictionary
         """
         retry = 0
+        
         while retry <= MAX_RETRY:
             try:
-                # Step 1: Get encryption key
+                # Step 1: Get encryption key (get new key for each attempt)
                 random_sleep(1.0, reason="Before getting encryption key")
                 key_data = self._get_encryption_key()
+                
                 key_id = key_data['keyId']
                 key_token = key_data['keyToken']
                 key = key_data['key']
+                
+                logger.debug(f"Key ID: {key_id}")
+                logger.debug(f"Key Token: {key_token}")
+                logger.debug(f"Key (first 20 chars): {key[:20]}...")
                 
                 # Step 2: Encrypt request data
                 request_data = {
@@ -239,6 +245,11 @@ class NextMusicTool:
                     headers=self.HEADERS,
                     timeout=30
                 )
+                
+                logger.debug(f"Response status code: {response.status_code}")
+                logger.debug(f"Response headers: {dict(response.headers)}")
+                logger.debug(f"Response raw text (first 500 chars): {response.text[:500]}")
+                
                 response.raise_for_status()
                 
                 response_json = response.json()
@@ -273,6 +284,7 @@ class NextMusicTool:
                 retry += 1
                 logger.error(f"Error processing NextMusic API request: {e}, retry {retry}/{MAX_RETRY}")
         
+        # Return consistent error format when all retries fail
         return {"code": 500, "message": "Failed to get song URL after retries", "data": None}
 
 

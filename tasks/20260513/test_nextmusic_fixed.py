@@ -3,7 +3,7 @@ Test script for NextMusicTool with AES-GCM encryption
 """
 import json
 import logging
-from tool_next_music import NextMusicTool
+from tool_next_music_v2 import NextMusicToolV2
 
 # Set logging level to DEBUG
 logging.basicConfig(level=logging.DEBUG, format='%(levelname)s:%(name)s:%(message)s')
@@ -15,7 +15,7 @@ def test_next_music_tool():
     print("=" * 60)
     
     # Initialize the tool
-    tool = NextMusicTool()
+    tool = NextMusicToolV2()
     
     # Test with a song ID from the log
     song_id = "2718994102"
