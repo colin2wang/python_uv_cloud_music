@@ -12,7 +12,7 @@ from mutagen.mp4 import MP4, MP4Cover
 
 from config_manager import config
 from logging_config import setup_logger
-from tool_next_music import NextMusicTool
+from tool_next_music_v2 import NextMusicToolV2
 from utils import (
     get_audio_extension, get_image_mime_type,
     get_mp4_image_format, clean_filename, random_sleep
@@ -424,16 +424,53 @@ def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> dict:
                 result_str = api.parse_song(song_id, try_quality_level)
 
                 try:
-                    result_json = json.loads(result_str)
+                    result_json = {}
 
                     # Replace url using Next Music Tool if configured
                     if config.should_use_next_music_tool():
                         logger.info("Replacing song URL with NextMusicTool...")
-                        next_music_tool = NextMusicTool()
-                        response = next_music_tool.get_song_url(song_id, try_quality_level)
-                        result_json['data']['url'] = response.get('data', {}).get('url')
-                        result_json['data']['level'] = response.get('data', {}).get('level')
-                        result_json['data']['size'] = response.get('data', {}).get('size')
+                        next_music_tool = NextMusicToolV2()
+                        song_info_response = next_music_tool.get_song_info(song_id)
+                        song_url_response = next_music_tool.get_song_url(song_id, try_quality_level)
+                        song_lyric_response = next_music_tool.get_song_lyric(song_id)
+                        
+                        # Check if song_url_response is valid
+                        if (song_url_response and song_info_response and isinstance(song_url_response, dict)
+                                and isinstance(song_info_response, dict)):
+                            # Merge song info and song url data
+                            song_info_data = song_info_response.get('data', {})
+                            song_url_data = song_url_response.get('data', {})
+                            
+                            result_json['data'] = {
+                                'url': song_url_data.get('url'),
+                                'level': song_url_data.get('level'),
+                                'size': song_url_data.get('size'),
+                                'name': song_info_data.get('name'),
+                                'ar_name': song_info_data.get('singer'),
+                                'al_name': song_info_data.get('album'),
+                                'pic': song_info_data.get('picimg'),
+                                'id': song_info_data.get('id'),
+                                'duration': song_info_data.get('duration')
+                            }
+                            
+                            # Add lyrics if available
+                            if song_lyric_response and isinstance(song_lyric_response, dict):
+                                lyric_data = song_lyric_response.get('data', {})
+                                if lyric_data and 'lrc' in lyric_data:
+                                    result_json['data']['lyric'] = lyric_data['lrc']
+                                    logger.info(f"Lyrics retrieved successfully for song {song_id}")
+                                else:
+                                    logger.warning(f"No lyrics found for song {song_id}")
+                            else:
+                                logger.warning(f"Failed to retrieve lyrics for song {song_id}")
+                            
+                            result_json['status'] = song_url_response.get('code')
+                        else:
+                            logger.error("NextMusicTool returned invalid song_url_response")
+                            retry_count += 1
+                            continue
+                    else:
+                        result_json = json.loads(result_str)
 
                     if result_json.get('status') == 200 and result_json.get('data', {}).get('url'):
                         # Set result first
@@ -548,7 +585,7 @@ def _write_mp3_metadata(audio_file: ID3, metadata: dict) -> None:
     # NetEase Cloud Music Song ID
     if song_id:
         from mutagen.id3 import TXXX
-        audio_file.add(TXXX(encoding=3, desc='CMUSIC_ID', text=song_id))
+        audio_file.add(TXXX(encoding=3, desc='CMUSIC_ID', text=str(song_id)))
 
     # Comments (lyrics)
     # Note: Use encoding=1 (UTF-16 with BOM) to properly preserve newlines in lyrics
@@ -592,7 +629,8 @@ def _write_flac_metadata(audio_file: FLAC, metadata: dict) -> None:
     if track_number:
         audio_file['TRACKNUMBER'] = track_number
     if song_id:
-        audio_file['CMUSIC_ID'] = song_id
+        # Ensure song_id is a string
+        audio_file['CMUSIC_ID'] = str(song_id)
 
     # Add cover
     if cover_path and os.path.exists(cover_path):
@@ -632,7 +670,8 @@ def _write_mp4_metadata(audio_file: MP4, metadata: dict) -> None:
     if track_number:
         mp4_tags['trkn'] = [(int(track_number), 0)]
     if song_id:
-        mp4_tags['----:CMUSIC_ID'] = song_id.encode('utf-8')
+        # Ensure song_id is a string before encoding
+        mp4_tags['----:CMUSIC_ID'] = str(song_id).encode('utf-8')
 
     # Add cover
     if cover_path and os.path.exists(cover_path):
