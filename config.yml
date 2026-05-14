@@ -53,7 +53,7 @@ metadata:
   max_lyric_length: 1000
 
   # Whether to use NextMusicTool to replace song URL (default: false)
-  use_next_music_tool: true
+  use_next_music_tool: false
 
 # Network Configuration
 network:

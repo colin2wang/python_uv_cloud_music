@@ -2,6 +2,8 @@
 
 A powerful Python-based tool for organizing, downloading, and managing your digital music library with automatic metadata tagging, cover art embedding, and interactive download interface.
 
+[CHANGE_HISTORY](CHANGE_HISTORY.md) | 
+
 ## Features
 
 - **Multi-format Support**: Works with MP3, FLAC, M4A, AAC, and other popular audio formats
@@ -19,8 +21,8 @@ A powerful Python-based tool for organizing, downloading, and managing your digi
 - **Configurable Behavior**: YAML-based configuration for customization without code changes
 - **Interactive Mode**: User-friendly interactive interface for easy song/album/playlist downloads
 - **Smart Retry Logic**: Automatic retry mechanism for failed API requests with configurable attempts
-- **NextMusicTool Integration**: Optional integration with NextMusicTool for enhanced URL resolution
-- **Progress Tracking**: Real-time progress display with estimated completion time for batch operations
+- **NextMusicTool V2 Integration**: Enhanced integration with NextMusicTool V2 featuring AES-GCM encryption for secure URL resolution and lyrics retrieval
+- **Progress Tracking**: Real-time progress display with current/total count for batch operations
 
 ## Installation
 
@@ -33,7 +35,7 @@ A powerful Python-based tool for organizing, downloading, and managing your digi
 
 Using pip:
 ```bash
-pip install requests mutagen pyyaml imagesize
+pip install requests mutagen pyyaml imagesize pycryptodome cryptography curl-cffi
 ```
 
 Or using uv (recommended):
@@ -392,16 +394,26 @@ network:
   api_delay_min: 1.0          # Minimum delay between API calls
 ```
 
-### NextMusicTool Integration
+### NextMusicTool V2 Integration
 
-Optionally integrate with NextMusicTool for enhanced URL resolution:
+Optionally integrate with NextMusicTool V2 for enhanced URL resolution with AES-GCM encryption:
 
 ```yaml
 metadata:
-  use_next_music_tool: true   # Enable NextMusicTool integration
+  use_next_music_tool: true   # Enable NextMusicTool V2 integration
 ```
 
-When enabled, the tool will use NextMusicTool to resolve song URLs, which may provide better availability or quality options.
+When enabled, the tool will use NextMusicTool V2 to resolve song URLs and retrieve lyrics with AES-GCM encryption, which provides:
+- Enhanced security through encrypted API communication
+- Better availability and quality options
+- Separate endpoints for song info, lyrics, and playback URLs
+- Automatic retry mechanism with intelligent backoff
+
+The NextMusicTool V2 (`tool_next_music_v2.py`) implements:
+- AES-GCM encryption/decryption for payload and response
+- Browser impersonation using curl-cffi library
+- Three separate API methods: `get_song_info()`, `get_song_lyric()`, `get_song_url()`
+- Configurable retry logic with random delays between attempts
 
 ### Logging
 
@@ -440,8 +452,9 @@ Special characters are automatically replaced with underscores to ensure cross-p
 ├── config.yml                          # YAML configuration file
 ├── logging_config.py                   # Logging configuration
 ├── utils.py                            # Utility functions
-├── tool_next_music.py                  # NextMusicTool integration
+├── tool_next_music_v2.py               # NextMusicTool V2 with AES-GCM encryption
 ├── pyproject.toml                      # Project dependencies
+├── CHANGE_HISTORY.md                   # Change history and version log
 ├── api_docs/                           # API documentation
 │   ├── get_song.md
 │   ├── get_album.md
@@ -515,8 +528,9 @@ This tool is designed for organizing personally licensed music. Please respect c
 
 ## Acknowledgments
 
-- Built with [requests](https://pypi.org/project/requests/) for HTTP operations
+- Built with [requests](https://pypi.org/project/requests/) and [curl-cffi](https://pypi.org/project/curl-cffi/) for HTTP operations
 - Metadata handling powered by [mutagen](https://pypi.org/project/mutagen/)
+- Encryption support via [pycryptodome](https://pypi.org/project/pycryptodome/) and [cryptography](https://pypi.org/project/cryptography/)
 - Package management by [uv](https://github.com/astral-sh/uv)
 
 ---
