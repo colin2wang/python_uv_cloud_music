@@ -6,15 +6,30 @@ This document records all significant changes to the Music Library Organizer pro
 
 ## 2026-05-17
 
-### Download Statistics Enhancement
+### Interactive Mode Enhancements & Download Statistics
 
-#### Improvements
-- **File Extension Statistics**: Added download statistics grouped by file extension
+#### New Features
+- **User Action Logging**: Added comprehensive logging for all user interactions in `interactive_process.py`
+  - Download method selection (song/album/playlist) with descriptive names
+  - Input parameters logging (IDs, quality settings)
+  - Track index selections and parsing results with input/output tracking
+  - Continue/exit decisions for session tracking
+  - Enhanced debugging and troubleshooting capabilities through detailed logs
+
+- **Download Statistics**: Added download statistics grouped by file extension
   - Implemented `_count_downloaded_songs()` function to scan and count audio files by format
   - Supports multiple formats: MP3, FLAC, M4A, AAC, WAV, OGG, WMA, MP2, MP1
   - Only counts audio files, excludes lyrics (.lrc) and cover image files
   - Displays statistics after album and playlist downloads complete
   - Shows formatted output with per-extension counts and total summary
+
+#### Bug Fixes
+- **Indexes Configuration**: Fixed issue where saved track indexes were not being used as defaults
+  - Album download now properly loads and suggests previous indexes as default input
+  - Playlist download now properly loads and suggests previous indexes as default input
+  - Users can press Enter to reuse last selected tracks without re-typing
+  - Improved user experience for repeated downloads of same content
+  - Better handling of empty indexes list conversion to string format
 
 ---
 
