@@ -4,6 +4,20 @@ This document records all significant changes to the Music Library Organizer pro
 
 ---
 
+## 2026-05-17
+
+### Download Statistics Enhancement
+
+#### Improvements
+- **File Extension Statistics**: Added download statistics grouped by file extension
+  - Implemented `_count_downloaded_songs()` function to scan and count audio files by format
+  - Supports multiple formats: MP3, FLAC, M4A, AAC, WAV, OGG, WMA, MP2, MP1
+  - Only counts audio files, excludes lyrics (.lrc) and cover image files
+  - Displays statistics after album and playlist downloads complete
+  - Shows formatted output with per-extension counts and total summary
+
+---
+
 ## 2026-05-13
 
 ### NextMusic AES-GCM Encryption Implementation

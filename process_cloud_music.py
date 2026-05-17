@@ -1149,6 +1149,34 @@ def prepare_album_folder(album_metadata: dict, download_dir: str | None = None) 
         return None
 
 
+def _count_downloaded_songs(download_dir: str) -> dict:
+    """
+    Count downloaded song files by extension in the download directory.
+    
+    Args:
+        download_dir: Directory to scan for song files
+        
+    Returns:
+        Dictionary with file extensions as keys and counts as values
+    """
+    from collections import Counter
+    
+    download_path = Path(download_dir)
+    if not download_path.exists():
+        return {}
+    
+    # Supported audio file extensions
+    audio_extensions = {'.mp3', '.flac', '.m4a', '.aac', '.wav', '.ogg', '.wma', '.mp2', '.mp1'}
+    
+    # Count files by extension
+    ext_counter = Counter()
+    for file_path in download_path.iterdir():
+        if file_path.is_file() and file_path.suffix.lower() in audio_extensions:
+            ext_counter[file_path.suffix.lower()] += 1
+    
+    return dict(ext_counter)
+
+
 def download_album(album_id: str, index_ids: list, level: str = "lossless"):
     if level is None:
         level = config.get_default_quality()
@@ -1179,6 +1207,19 @@ def download_album(album_id: str, index_ids: list, level: str = "lossless"):
     album_name = album_metadata['album_name']
     logger.info(f"Completed downloading album: {album_artist} - {album_name}")
     logger.info(f"Total downloaded: {index}")
+    
+    # Statistics by file extension
+    download_dir = config.get_download_dir()
+    stats = _count_downloaded_songs(download_dir)
+    if stats:
+        logger.info("=" * 60)
+        logger.info("Download Statistics by File Extension:")
+        total_count = 0
+        for ext, count in sorted(stats.items()):
+            logger.info(f"  {ext.upper()}: {count} files")
+            total_count += count
+        logger.info(f"  Total: {total_count} files")
+        logger.info("=" * 60)
 
 
 def download_playlist(playlist_id: str, index_ids: list, level: str = "lossless"):
@@ -1203,6 +1244,19 @@ def download_playlist(playlist_id: str, index_ids: list, level: str = "lossless"
             download_song_and_resources(metadata, idx=None, current_index=index + 1, total_count=len(playlist_metadata['song_ids']))
         index += 1
     logger.info(f"Total downloaded: {index}")
+    
+    # Statistics by file extension
+    download_dir = config.get_download_dir()
+    stats = _count_downloaded_songs(download_dir)
+    if stats:
+        logger.info("=" * 60)
+        logger.info("Download Statistics by File Extension:")
+        total_count = 0
+        for ext, count in sorted(stats.items()):
+            logger.info(f"  {ext.upper()}: {count} files")
+            total_count += count
+        logger.info(f"  Total: {total_count} files")
+        logger.info("=" * 60)
 
 
 if __name__ == "__main__":
