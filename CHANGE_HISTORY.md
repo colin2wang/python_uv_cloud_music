@@ -31,6 +31,33 @@ This document records all significant changes to the Music Library Organizer pro
   - Improved user experience for repeated downloads of same content
   - Better handling of empty indexes list conversion to string format
 
+### Startup Script Enhancements
+
+#### New Features
+- **Enhanced Command-Line Interface**: Updated `scripts/cloud-music.cmd` with advanced parameter support
+  - Added `--help` parameter to display comprehensive usage information
+  - Added `--folder-only` parameter to switch to project directory only, skipping all subsequent steps
+  - Renamed `--git` to `--git-pull` with support for specifying remote source
+  - Default remote source is "origin", can be customized via second parameter
+  - Improved user experience with clear help documentation and examples
+
+#### Bug Fixes
+- **Cmder/Terminal Compatibility**: Fixed command parsing issues in Cmder and other terminal emulators
+  - **Problem**: Using `if` statement blocks with parentheses caused command truncation errors (`'cho' is not recognized`)
+  - **Root Cause**: Multi-line `if` blocks with Chinese characters triggered encoding and parsing issues in Cmder
+  - **Solution**: Refactored script to use `goto` labels instead of `if` blocks for parameter handling
+  - Removed problematic commands: `chcp 65001 >nul`, `setlocal enabledelayedexpansion`, `cls`
+  - Used English-only text to avoid character encoding issues
+  - Added error suppression (`2>nul`) to `cd /d` command for cleaner output
+  - All parameters are now checked before directory changes to prevent context issues
+
+#### Usage Examples
+- `cloud-music.cmd` - Normal operation: open download folder and start script
+- `cloud-music.cmd --help` - Display help information
+- `cloud-music.cmd --folder-only` - Only switch to project directory
+- `cloud-music.cmd --git-pull` - Pull from default remote (origin)
+- `cloud-music.cmd --git-pull upstream` - Pull from specified remote source
+
 ---
 
 ## 2026-05-13
