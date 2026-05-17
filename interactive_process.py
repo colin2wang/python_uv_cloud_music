@@ -160,9 +160,13 @@ def select_download_method(default_method: int = 1) -> int:
     while True:
         choice = input(f"Enter your choice (0-3) [{default_method}]: ").strip()
         if choice == '':
+            logger.info(f"User selected download method: {default_method} (default)")
             return default_method
         elif choice in ['0', '1', '2', '3']:
-            return int(choice)
+            method_num = int(choice)
+            method_names = {0: 'Exit', 1: 'Single Song', 2: 'Album', 3: 'Playlist'}
+            logger.info(f"User selected download method: {method_num} ({method_names[method_num]})")
+            return method_num
         else:
             print("Invalid choice. Please enter 0, 1, 2, or 3.")
 
@@ -187,6 +191,8 @@ def main():
             last_song_id = last_config.get('song_id', '')
             resource_id = get_user_input("Enter Song ID (e.g., 2163629816)", last_song_id)
             quality = get_user_input("Enter quality level", last_config.get('quality', 'lossless'))
+            
+            logger.info(f"User input - Method: Single Song, Song ID: {resource_id}, Quality: {quality}")
             
             print(f"\nStarting download...")
             print(f"Song ID: {resource_id}")
@@ -215,6 +221,8 @@ def main():
             # Ask if user wants to specify indexes
             want_indexes = input("\nDo you want to download specific tracks only? (yes/no) [no]: ").strip().lower()
             
+            logger.info(f"User input - Method: Album, Album ID: {resource_id}, Quality: {quality}, Want specific tracks: {want_indexes}")
+            
             indexes = []
             if want_indexes in ['yes', 'y']:
                 print("\nEnter track numbers to download (separated by spaces or commas)")
@@ -222,12 +230,15 @@ def main():
                 
                 # Show last used indexes as default if available
                 last_indexes = last_config.get('indexes', [])
+                last_indexes_str = ' '.join(map(str, last_indexes)) if last_indexes else ''
                 if last_indexes:
                     print(f"Last used indexes: {last_indexes}")
                 
                 while True:
-                    index_input = get_user_input("Enter track numbers")
+                    index_input = get_user_input("Enter track numbers", last_indexes_str)
                     indexes = parse_indexes(index_input)
+                    
+                    logger.info(f"User entered track indexes: '{index_input}' -> Parsed: {indexes}")
                     
                     if confirm_indexes(indexes):
                         break
@@ -235,6 +246,7 @@ def main():
                         print("Please re-enter the track numbers.")
             else:
                 print("Downloading all tracks in the album.")
+                logger.info("User chose to download all tracks in album")
             
             print(f"\nStarting download...")
             print(f"Album ID: {resource_id}")
@@ -268,6 +280,8 @@ def main():
             # Ask if user wants to specify indexes
             want_indexes = input("\nDo you want to download specific tracks only? (yes/no) [no]: ").strip().lower()
             
+            logger.info(f"User input - Method: Playlist, Playlist ID: {resource_id}, Quality: {quality}, Want specific tracks: {want_indexes}")
+            
             indexes = []
             if want_indexes in ['yes', 'y']:
                 print("\nEnter track numbers to download (separated by spaces or commas)")
@@ -275,12 +289,15 @@ def main():
                 
                 # Show last used indexes as default if available
                 last_indexes = last_config.get('indexes', [])
+                last_indexes_str = ' '.join(map(str, last_indexes)) if last_indexes else ''
                 if last_indexes:
                     print(f"Last used indexes: {last_indexes}")
                 
                 while True:
-                    index_input = get_user_input("Enter track numbers")
+                    index_input = get_user_input("Enter track numbers", last_indexes_str)
                     indexes = parse_indexes(index_input)
+                    
+                    logger.info(f"User entered track indexes: '{index_input}' -> Parsed: {indexes}")
                     
                     if confirm_indexes(indexes):
                         break
@@ -288,6 +305,7 @@ def main():
                         print("Please re-enter the track numbers.")
             else:
                 print("Downloading all tracks in the playlist.")
+                logger.info("User chose to download all tracks in playlist")
             
             print(f"\nStarting download...")
             print(f"Playlist ID: {resource_id}")
@@ -316,6 +334,7 @@ def main():
         # Ask if user wants to continue
         print("\n" + "=" * 60)
         again = input("Do you want to download more? (yes/no) [yes]: ").strip().lower()
+        logger.info(f"User chose to continue: {again if again else 'yes (default)'}")
         if again in ['no', 'n']:
             print("\nThank you for using Cloud Music Download Tool. Goodbye!")
             break
