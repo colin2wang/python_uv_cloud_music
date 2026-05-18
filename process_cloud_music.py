@@ -9,6 +9,7 @@ import requests
 from mutagen.flac import FLAC, Picture
 from mutagen.id3 import ID3, TIT2, TPE1, TALB, APIC, COMM, TYER
 from mutagen.mp4 import MP4, MP4Cover
+from tqdm import tqdm
 
 from config_manager import config
 from logging_config import setup_logger
@@ -943,10 +944,32 @@ def download_song_and_resources(
     try:
         response = requests.get(download_url, stream=True, timeout=config.get_timeout())
         response.raise_for_status()
+        
+        # Get total file size
+        total_size = int(response.headers.get('content-length', 0))
+        
+        # Download with progress bar
         with open(music_file_path, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    f.write(chunk)
+            if total_size > 0:
+                # Use tqdm for progress bar
+                with tqdm(
+                    total=total_size,
+                    unit='B',
+                    unit_scale=True,
+                    unit_divisor=1024,
+                    desc=f"{progress_info}{filename}",
+                    ncols=100
+                ) as pbar:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+                            pbar.update(len(chunk))
+            else:
+                # Fallback without progress bar if size unknown
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+        
         logger.info(f"Music file downloaded: {music_file_path.name}")
     except requests.RequestException as e:
         logger.error(f"Music file download failed: {e}")
