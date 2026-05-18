@@ -4,6 +4,24 @@ This document records all significant changes to the Music Library Organizer pro
 
 ---
 
+## 2026-05-18
+
+### Download Progress Bar Implementation
+
+#### New Features
+- **Download Progress Bar**: Added visual progress bar for music file downloads using `tqdm`
+  - Real-time download progress display with percentage completion
+  - Shows downloaded size vs total size with automatic unit scaling (KB/MB)
+  - Displays download speed and estimated time remaining
+  - Includes song index and filename in progress bar description
+  - Graceful fallback when file size is unavailable from server
+  - Enhanced user experience during batch downloads
+
+#### Dependencies
+- Added `tqdm>=4.66.0` package for progress bar functionality
+
+---
+
 ## 2026-05-17
 
 ### Interactive Mode Enhancements & Download Statistics
