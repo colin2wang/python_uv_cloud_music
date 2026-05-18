@@ -42,21 +42,19 @@ class MusicToolAPI:
         
         # Set browser-simulated request headers (excluding HTTP/2 pseudo-headers)
         self.session.headers.update({
-            'accept': 'application/json, text/javascript, */*; q=0.01',
-            'accept-encoding': 'gzip, deflate, br, zstd',
+            'accept': '*/*',
             'accept-language': 'zh-CN,zh;q=0.9',
-            'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'content-type': 'application/x-www-form-urlencoded',
             'origin': base_url,
             'priority': 'u=1, i',
             'referer': base_url,
-            'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"',
+            'sec-ch-ua': '"Not A(Brand";v="8", "Chromium";v="132", "Google Chrome";v="132"',
             'sec-ch-ua-mobile': '?0',
             'sec-ch-ua-platform': '"Windows"',
             'sec-fetch-dest': 'empty',
             'sec-fetch-mode': 'cors',
             'sec-fetch-site': 'same-origin',
-            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
-            'x-requested-with': 'XMLHttpRequest'
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36'
         })
 
     def _extract_id(self, text: str, pattern_type: str = 'song') -> str:
@@ -506,8 +504,9 @@ def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> dict:
                         else:
                             # Max retries reached
                             break
-                except json.JSONDecodeError:
-                    logger.error(f"Quality {try_quality_level} parsing failed (attempt {retry_count + 1})")
+                except json.JSONDecodeError as e:
+                    logger.error(f"Quality {try_quality_level} parsing failed (attempt {retry_count + 1}): {str(e)}")
+                    logger.error(f"Raw response: {result_str}")
                     retry_count += 1
                     continue
             except requests.exceptions.RequestException as e:
@@ -966,8 +965,9 @@ def download_song_and_resources(
             logger.info(f"Metadata attached: {music_file_path.name}")
         else:
             logger.warning("Metadata writing failed, retrying...")
-            for retry_count in range(3):
-                logger.info(f"Retry {retry_count + 1}/3...")
+            max_metadata_retries = config.get_max_retries()
+            for retry_count in range(max_metadata_retries):
+                logger.info(f"Retry {retry_count + 1}/{max_metadata_retries}...")
                 if write_metadata_to_file(music_file_path, metadata_for_tagging):
                     break
 
@@ -1010,6 +1010,13 @@ def download_song_and_resources(
 
 
 def download_song(song_id: str, level: str = "lossless"):
+    """
+    Download a single song by song ID.
+
+    Args:
+        song_id: Song ID to download
+        level: Audio quality level (default: from config)
+    """
     if level is None:
         level = config.get_default_quality()
     metadata = get_song_metadata_by_song_id(song_id, level)
@@ -1178,6 +1185,14 @@ def _count_downloaded_songs(download_dir: str) -> dict:
 
 
 def download_album(album_id: str, index_ids: list, level: str = "lossless"):
+    """
+    Download all songs from an album.
+
+    Args:
+        album_id: Album ID to download
+        index_ids: List of specific song indexes to download (empty list means all songs)
+        level: Audio quality level (default: from config)
+    """
     if level is None:
         level = config.get_default_quality()
     album_metadata = get_song_ids_by_album_id(album_id)
@@ -1186,6 +1201,7 @@ def download_album(album_id: str, index_ids: list, level: str = "lossless"):
     prepare_album_folder(album_metadata)
 
     index = 0
+    failed_indexes = []  # Track failed song indexes
     for song_id in album_metadata['song_ids']:
         song_detail = album_metadata['song_details'][index]
         song_index = song_detail['index']
@@ -1195,18 +1211,29 @@ def download_album(album_id: str, index_ids: list, level: str = "lossless"):
             if song_index in index_ids:
                 logger.info(f"{song_index} is in the {index_ids}, continue downloading...")
                 metadata = get_song_metadata_by_song_id(song_id, level)
-                download_song_and_resources(metadata, idx=song_index, current_index=index + 1, total_count=len(album_metadata['song_ids']))
+                success = download_song_and_resources(metadata, idx=song_index, current_index=index + 1, total_count=len(album_metadata['song_ids']))
+                if not success:
+                    failed_indexes.append(song_index)
             else:
                 logger.info(f"{song_index} is not in the {index_ids}, skipping downloading...")
         else:
             metadata = get_song_metadata_by_song_id(song_id, level)
-            download_song_and_resources(metadata, idx=song_index, current_index=index + 1, total_count=len(album_metadata['song_ids']))
+            success = download_song_and_resources(metadata, idx=song_index, current_index=index + 1, total_count=len(album_metadata['song_ids']))
+            if not success:
+                failed_indexes.append(song_index)
         index += 1
 
     album_artist = album_metadata['album_artist']
     album_name = album_metadata['album_name']
     logger.info(f"Completed downloading album: {album_artist} - {album_name}")
     logger.info(f"Total downloaded: {index}")
+    
+    # Show failed downloads
+    if failed_indexes:
+        logger.info("=" * 60)
+        logger.warning(f"Failed to download {len(failed_indexes)} song(s):")
+        logger.warning(f"Failed indexes: {failed_indexes}")
+        logger.info("=" * 60)
     
     # Statistics by file extension
     download_dir = config.get_download_dir()
@@ -1223,10 +1250,19 @@ def download_album(album_id: str, index_ids: list, level: str = "lossless"):
 
 
 def download_playlist(playlist_id: str, index_ids: list, level: str = "lossless"):
+    """
+    Download all songs from a playlist.
+
+    Args:
+        playlist_id: Playlist ID to download
+        index_ids: List of specific song indexes to download (empty list means all songs)
+        level: Audio quality level (default: from config)
+    """
     if level is None:
         level = config.get_default_quality()
     playlist_metadata = get_song_ids_by_playlist_id(playlist_id)
     index = 0
+    failed_indexes = []  # Track failed song indexes
     for song_id in playlist_metadata['song_ids']:
         song_detail = playlist_metadata['song_details'][index]
         song_index = song_detail['index']
@@ -1236,14 +1272,25 @@ def download_playlist(playlist_id: str, index_ids: list, level: str = "lossless"
             if song_index in index_ids:
                 logger.info(f"{song_index} is in the {index_ids}, continue downloading...")
                 metadata = get_song_metadata_by_song_id(song_id, level)
-                download_song_and_resources(metadata, idx=None, current_index=index + 1, total_count=len(playlist_metadata['song_ids']))
+                success = download_song_and_resources(metadata, idx=None, current_index=index + 1, total_count=len(playlist_metadata['song_ids']))
+                if not success:
+                    failed_indexes.append(song_index)
             else:
                 logger.info(f"{song_index} is not in the {index_ids}, skipping downloading...")
         else:
             metadata = get_song_metadata_by_song_id(song_id, level)
-            download_song_and_resources(metadata, idx=None, current_index=index + 1, total_count=len(playlist_metadata['song_ids']))
+            success = download_song_and_resources(metadata, idx=None, current_index=index + 1, total_count=len(playlist_metadata['song_ids']))
+            if not success:
+                failed_indexes.append(song_index)
         index += 1
     logger.info(f"Total downloaded: {index}")
+    
+    # Show failed downloads
+    if failed_indexes:
+        logger.info("=" * 60)
+        logger.warning(f"Failed to download {len(failed_indexes)} song(s):")
+        logger.warning(f"Failed indexes: {failed_indexes}")
+        logger.info("=" * 60)
     
     # Statistics by file extension
     download_dir = config.get_download_dir()

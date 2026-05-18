@@ -124,7 +124,7 @@ class ConfigManager:
                 'timeout': 30,
                 'random_delay_max': 2.5,
                 'api_delay_min': 1.0,
-                'max_retries': 1
+                'max_retries': 3
             },
             'logging': {
                 'level': 'INFO',
@@ -247,7 +247,7 @@ class ConfigManager:
     
     def get_max_retries(self) -> int:
         """Get maximum number of retries for failed requests"""
-        return self.get('network.max_retries', 1)
+        return self.get('network.max_retries', 3)
     
     def reload(self) -> dict:
         """
