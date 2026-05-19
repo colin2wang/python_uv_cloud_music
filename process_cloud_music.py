@@ -508,6 +508,11 @@ def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> dict:
                 except json.JSONDecodeError as e:
                     logger.error(f"Quality {try_quality_level} parsing failed (attempt {retry_count + 1}): {str(e)}")
                     logger.error(f"Raw response: {result_str}")
+                    
+                    # Check if it's a 429 Too Many Requests error
+                    if '429 Too Many Requests' in result_str or 'Too Many Requests' in result_str:
+                        random_sleep(min_delay=10.0, max_delay=15.0, reason="429 Too Many Requests - API rate limit")
+                    
                     retry_count += 1
                     continue
             except requests.exceptions.RequestException as e:
@@ -943,6 +948,14 @@ def download_song_and_resources(
     random_sleep(reason="Before downloading music file")
     try:
         response = requests.get(download_url, stream=True, timeout=config.get_timeout())
+        
+        # Check for 429 Too Many Requests
+        if response.status_code == 429:
+            logger.warning("Received 429 Too Many Requests while downloading music.")
+            random_sleep(min_delay=10.0, max_delay=15.0, reason="429 Too Many Requests - download rate limit")
+            # Retry the request
+            response = requests.get(download_url, stream=True, timeout=config.get_timeout())
+        
         response.raise_for_status()
         
         # Get total file size
@@ -1014,6 +1027,14 @@ def download_song_and_resources(
         random_sleep(reason="Before downloading cover image")
         try:
             cover_response = requests.get(f"{cover_url}?param=320x320", timeout=10)
+            
+            # Check for 429 Too Many Requests
+            if cover_response.status_code == 429:
+                logger.warning("Received 429 Too Many Requests while downloading cover.")
+                random_sleep(min_delay=10.0, max_delay=15.0, reason="429 Too Many Requests - cover download rate limit")
+                # Retry the request
+                cover_response = requests.get(f"{cover_url}?param=320x320", timeout=10)
+            
             cover_response.raise_for_status()
             with open(cover_file_path, 'wb') as f:
                 f.write(cover_response.content)
@@ -1161,6 +1182,14 @@ def prepare_album_folder(album_metadata: dict, download_dir: str | None = None) 
                 logger.info("Downloading album cover...")
                 random_sleep(reason="Before downloading album cover")
                 cover_response = requests.get(album_cover_url, timeout=10)
+                
+                # Check for 429 Too Many Requests
+                if cover_response.status_code == 429:
+                    logger.warning("Received 429 Too Many Requests while downloading album cover.")
+                    random_sleep(min_delay=10.0, max_delay=15.0, reason="429 Too Many Requests - album cover download rate limit")
+                    # Retry the request
+                    cover_response = requests.get(album_cover_url, timeout=10)
+                
                 cover_response.raise_for_status()
 
                 with open(cover_file_path, 'wb') as f:

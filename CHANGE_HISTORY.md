@@ -4,6 +4,31 @@ This document records all significant changes to the Music Library Organizer pro
 
 ---
 
+## 2026-05-19
+
+### Enhanced Rate Limiting & 429 Error Handling
+
+#### New Features
+- **Enhanced `random_sleep` Function**: Added `min_delay` parameter (default: 1.0s) for flexible delay control while maintaining backward compatibility
+
+- **Comprehensive 429 Error Handling**: Implemented rate limit detection and recovery across all API calls including metadata requests, music/cover downloads, and NextMusic API methods (`get_song_info`, `get_song_lyric`, `get_song_url`)
+
+#### Implementation Details
+- **Smart Error Detection**: Identifies 429 errors through HTTP status codes and response content analysis ("429 Too Many Requests")
+
+- **Intelligent Retry Strategy**: 429 errors trigger 10-15 second random delays; other transient errors use existing 10-20 second delays with automatic retry
+
+- **Enhanced Logging**: Warning-level logs with descriptive reason strings for easy identification of rate limiting events
+
+#### Files Modified
+- `utils.py`: Enhanced `random_sleep()` function
+- `process_cloud_music.py`: Added 429 handling in metadata retrieval and all download operations
+
+#### Benefits
+Prevents API bans, improves download success rates during high-load periods, provides automatic recovery, and maintains compliance with API rate limiting policies
+
+---
+
 ## 2026-05-18
 
 ### Download Progress Bar Implementation
