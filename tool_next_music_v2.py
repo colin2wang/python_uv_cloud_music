@@ -129,7 +129,7 @@ class NextMusicToolV2:
         
         for attempt in range(1, max_retries + 1):
             try:
-                random_sleep(3.0, reason="Next Music Tool fetching song lyric")
+                random_sleep(min_delay=20.0, max_delay=30.0, reason="Next Music Tool fetching song lyric")
                 logger.info(f"Attempt {attempt}/{max_retries} - Fetching session key...")
                 # impersonate="chrome120" is the key! It makes the website firewall think this is a real Chrome browser request
                 key_res = requests.post("https://nextmusic.toubiec.cn/api/key", headers=HEADERS, impersonate="chrome120")
@@ -189,7 +189,7 @@ class NextMusicToolV2:
         
         for attempt in range(1, max_retries + 1):
             try:
-                random_sleep(3.0, reason="Next Music Tool fetching song playback URL")
+                random_sleep(min_delay=20.0, max_delay=30.0, reason="Next Music Tool fetching song playback URL")
                 logger.info(f"Attempt {attempt}/{max_retries} - Fetching session key...")
                 # impersonate="chrome120" is the key! It makes the website firewall think this is a real Chrome browser request
                 key_res = requests.post("https://nextmusic.toubiec.cn/api/key", headers=HEADERS, impersonate="chrome120")

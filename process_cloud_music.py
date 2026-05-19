@@ -1050,6 +1050,9 @@ def download_song_and_resources(
         write_picture_to_file(music_file_path)
 
     logger.info(f"Download completed! Files saved in: {download_dir}")
+
+    # Sleep for each download turns
+    random_sleep(min_delay=20.0, max_delay=30.0, reason="Sleep 20-30 seconds each download turns.")
     return True
 
 
