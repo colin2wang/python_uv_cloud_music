@@ -249,21 +249,44 @@ def random_sleep(max_delay: float = None, min_delay: float = 1.0, reason: str = 
     delay = random.uniform(min_delay, max_delay)
     logger.info(f"Random sleeping for {delay:.2f} seconds (range: {min_delay:.2f}-{max_delay:.2f}s)... (Reason: {reason})")
     
-    # Show progress bar during sleep
-    with tqdm(
-        total=int(delay * 10),
-        desc=f"Waiting ({reason})",
-        unit="0.1s",
-        ncols=100,
-        bar_format='{desc}: |{bar}| {percentage:3.0f}% [{elapsed}<{remaining}]'
-    ) as pbar:
-        elapsed = 0
-        step = 0.1  # Update every 0.1 seconds
-        while elapsed < delay:
-            time.sleep(step)
-            elapsed += step
-            pbar.update(1)
-        # Ensure we complete the full delay
-        remaining = delay - elapsed
+    # Show simple text progress during sleep
+    start_time = time.time()
+    end_time = start_time + delay
+    
+    while time.time() < end_time:
+        remaining = end_time - time.time()
         if remaining > 0:
-            time.sleep(remaining)
+            # Display countdown in console
+            print(f"\rWaiting ({reason}): {remaining:.2f}s remaining...", end="", flush=True)
+            time.sleep(min(0.1, remaining))
+        else:
+            break
+    
+    # Clear the line after completion
+    print("\r" + " " * 60 + "\r", end="", flush=True)
+    logger.info(f"Sleep completed.")
+
+
+def main():
+    """
+    Test function for random_sleep utility
+    """
+    print("Testing random_sleep function...")
+    
+    # Test 1: Default parameters
+    print("\nTest 1: Using default parameters")
+    random_sleep(reason="Test 1 - Default settings")
+    
+    # Test 2: Custom delay range
+    print("\nTest 2: Custom delay range (2-3 seconds)")
+    random_sleep(max_delay=3.0, min_delay=2.0, reason="Test 2 - Custom range")
+    
+    # Test 3: Short delay
+    print("\nTest 3: Short delay (0.5-1 second)")
+    random_sleep(max_delay=1.0, min_delay=0.5, reason="Test 3 - Short delay")
+    
+    print("\nAll tests completed!")
+
+
+if __name__ == "__main__":
+    main()
