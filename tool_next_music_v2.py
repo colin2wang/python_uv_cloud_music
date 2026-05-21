@@ -64,22 +64,40 @@ class NextMusicToolV2:
         decrypted_bytes = aesgcm.decrypt(iv, cipher_text + auth_tag, None)
         return json.loads(decrypted_bytes.decode('utf-8'))
 
+    def _fetch_session_key(self, attempt: int, max_retries: int) -> dict:
+        """Fetch session key from NextMusic API
+        
+        Args:
+            attempt: Current retry attempt number
+            max_retries: Maximum retry count
+            
+        Returns:
+            Dictionary containing key_id, key_token, and aes_key
+        """
+        logger.info(f"Attempt {attempt}/{max_retries} - Fetching session key...")
+        # impersonate="chrome120" is the key! It makes the website firewall think this is a real Chrome browser request
+        key_res = requests.post("https://nextmusic.toubiec.cn/api/key", headers=HEADERS, impersonate="chrome120")
+        key_res.raise_for_status()
+
+        key_info = key_res.json().get('data', {})
+        key_id = key_info.get('keyId')
+        key_token = key_info.get('keyToken')
+        aes_key = key_info.get('key')
+        logger.info(f"   [Success] Got KeyId: {key_id}")
+        
+        return {
+            'key_id': key_id,
+            'key_token': key_token,
+            'aes_key': aes_key
+        }
+
     def get_song_info(self, song_id: str, max_retries: int = MAX_RETRY):
         """Get song info from NextMusic API with retry mechanism"""
         last_error = None
         
         for attempt in range(1, max_retries + 1):
             try:
-                logger.info(f"Attempt {attempt}/{max_retries} - Fetching session key...")
-                # impersonate="chrome120" is the key! It makes the website firewall think this is a real Chrome browser request
-                key_res = requests.post("https://nextmusic.toubiec.cn/api/key", headers=HEADERS, impersonate="chrome120")
-                key_res.raise_for_status()
-
-                key_info = key_res.json().get('data', {})
-                key_id = key_info.get('keyId')
-                key_token = key_info.get('keyToken')
-                aes_key = key_info.get('key')
-                logger.info(f"   [Success] Got KeyId: {key_id}")
+                key_data = self._fetch_session_key(attempt, max_retries)
 
                 logger.info(f"\nRequesting song info (SongID: {song_id})...")
                 url_payload = {
@@ -87,9 +105,9 @@ class NextMusicToolV2:
                 }
 
                 request_body = {
-                    "keyId": key_id,
-                    "keyToken": key_token,
-                    "data": self.encrypt_payload(url_payload, aes_key)
+                    "keyId": key_data['key_id'],
+                    "keyToken": key_data['key_token'],
+                    "data": self.encrypt_payload(url_payload, key_data['aes_key'])
                 }
 
                 logger.debug(json.dumps(request_body, indent=2))
@@ -101,7 +119,7 @@ class NextMusicToolV2:
 
                 if 'ciphertext' in response_json:
                     logger.info("\nServer returned ciphertext, decrypting...")
-                    decrypted_data = self.decrypt_response(response_json['ciphertext'], aes_key)
+                    decrypted_data = self.decrypt_response(response_json['ciphertext'], key_data['aes_key'])
                     logger.info("\n==== Decryption Result ====")
                     logger.info(json.dumps(decrypted_data, indent=4, ensure_ascii=False))
                     return decrypted_data
@@ -128,18 +146,13 @@ class NextMusicToolV2:
         last_error = None
         
         for attempt in range(1, max_retries + 1):
-            try:
-                random_sleep(min_delay=20.0, max_delay=30.0, reason="Next Music Tool fetching song lyric")
-                logger.info(f"Attempt {attempt}/{max_retries} - Fetching session key...")
-                # impersonate="chrome120" is the key! It makes the website firewall think this is a real Chrome browser request
-                key_res = requests.post("https://nextmusic.toubiec.cn/api/key", headers=HEADERS, impersonate="chrome120")
-                key_res.raise_for_status()
+            if attempt > 1:
+                logger.info(f"Retrying... (Attempt {attempt}/{max_retries})")
+                random_sleep(min_delay=30.0, max_delay=35.0, reason="Next Music Tool fetching song lyric retrying...")
 
-                key_info = key_res.json().get('data', {})
-                key_id = key_info.get('keyId')
-                key_token = key_info.get('keyToken')
-                aes_key = key_info.get('key')
-                logger.info(f"   [Success] Got KeyId: {key_id}")
+            try:
+                random_sleep(max_delay=3.0, reason="Next Music Tool fetching song lyric")
+                key_data = self._fetch_session_key(attempt, max_retries)
 
                 logger.info(f"\nRequesting song lyric (SongID: {song_id})...")
                 lyric_payload = {
@@ -147,9 +160,9 @@ class NextMusicToolV2:
                 }
 
                 request_body = {
-                    "keyId": key_id,
-                    "keyToken": key_token,
-                    "data": self.encrypt_payload(lyric_payload, aes_key)
+                    "keyId": key_data['key_id'],
+                    "keyToken": key_data['key_token'],
+                    "data": self.encrypt_payload(lyric_payload, key_data['aes_key'])
                 }
 
                 logger.debug(json.dumps(request_body, indent=2))
@@ -161,7 +174,7 @@ class NextMusicToolV2:
 
                 if 'ciphertext' in response_json:
                     logger.info("\nServer returned ciphertext, decrypting...")
-                    decrypted_data = self.decrypt_response(response_json['ciphertext'], aes_key)
+                    decrypted_data = self.decrypt_response(response_json['ciphertext'], key_data['aes_key'])
                     logger.info("\n==== Decryption Result ====")
                     logger.info(json.dumps(decrypted_data, indent=4, ensure_ascii=False))
                     return decrypted_data
@@ -188,18 +201,13 @@ class NextMusicToolV2:
         last_error = None
         
         for attempt in range(1, max_retries + 1):
-            try:
-                random_sleep(min_delay=20.0, max_delay=30.0, reason="Next Music Tool fetching song playback URL")
-                logger.info(f"Attempt {attempt}/{max_retries} - Fetching session key...")
-                # impersonate="chrome120" is the key! It makes the website firewall think this is a real Chrome browser request
-                key_res = requests.post("https://nextmusic.toubiec.cn/api/key", headers=HEADERS, impersonate="chrome120")
-                key_res.raise_for_status()
+            if attempt > 1:
+                logger.info(f"Retrying... (Attempt {attempt}/{max_retries})")
+                random_sleep(min_delay=30.0, max_delay=35.0, reason="Next Music Tool fetching song lyric retrying...")
 
-                key_info = key_res.json().get('data', {})
-                key_id = key_info.get('keyId')
-                key_token = key_info.get('keyToken')
-                aes_key = key_info.get('key')
-                logger.info(f"   [Success] Got KeyId: {key_id}")
+            try:
+                random_sleep(max_delay=3.0, reason="Next Music Tool fetching song playback URL")
+                key_data = self._fetch_session_key(attempt, max_retries)
 
                 logger.info(f"\nRequesting song playback URL (SongID: {song_id})...")
                 url_payload = {
@@ -208,9 +216,9 @@ class NextMusicToolV2:
                 }
 
                 request_body = {
-                    "keyId": key_id,
-                    "keyToken": key_token,
-                    "data": self.encrypt_payload(url_payload, aes_key)
+                    "keyId": key_data['key_id'],
+                    "keyToken": key_data['key_token'],
+                    "data": self.encrypt_payload(url_payload, key_data['aes_key'])
                 }
 
                 logger.debug(json.dumps(request_body, indent=2))
@@ -222,7 +230,7 @@ class NextMusicToolV2:
 
                 if 'ciphertext' in response_json:
                     logger.info("\nServer returned ciphertext, decrypting...")
-                    decrypted_data = self.decrypt_response(response_json['ciphertext'], aes_key)
+                    decrypted_data = self.decrypt_response(response_json['ciphertext'], key_data['aes_key'])
                     logger.info("\n==== Decryption Result ====")
                     logger.info(json.dumps(decrypted_data, indent=4, ensure_ascii=False))
                     if 'data' in decrypted_data and 'url' in decrypted_data['data']:

@@ -1052,7 +1052,7 @@ def download_song_and_resources(
     logger.info(f"Download completed! Files saved in: {download_dir}")
 
     # Sleep for each download turns
-    random_sleep(min_delay=20.0, max_delay=30.0, reason="Sleep 20-30 seconds each download turns.")
+    random_sleep(min_delay=30.0, max_delay=35.0, reason="Sleeping for each download turns.")
     return True
 
 

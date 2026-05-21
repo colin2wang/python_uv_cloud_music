@@ -246,5 +246,5 @@ def random_sleep(max_delay: float = None, min_delay: float = 1.0, reason: str = 
     if max_delay is None:
         max_delay = config.get_random_delay_max()
     delay = random.uniform(min_delay, max_delay)
-    logger.info(f"Sleeping for {delay:.2f} seconds... ({reason})")
+    logger.info(f"Random sleeping for {delay:.2f} seconds (range: {min_delay:.2f}-{max_delay:.2f}s)... (Reason: {reason})")
     time.sleep(delay)
