@@ -475,7 +475,7 @@ def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> dict:
                                 'level': song_url_data.get('level'),
                                 'size': song_url_data.get('size'),
                                 'name': song_info_data.get('name'),
-                                'ar_name': song_info_data.get('singer'),
+                                'ar_name': song_info_data.get('singer', '').replace('/', ', ') if song_info_data.get('singer') else '',
                                 'al_name': song_info_data.get('album'),
                                 'pic': song_info_data.get('picimg'),
                                 'id': song_info_data.get('id'),
@@ -1402,14 +1402,14 @@ def download_playlist(playlist_id: str, index_ids: list, level: str = "lossless"
 if __name__ == "__main__":
     # Part-1 Download Song by Song ID
     # https://music.163.com/song?id=
-    # download_song("2163629816")
+    download_song("2618710190")
 
     indexes = []
     # indexes = [4, 6, 15, 18, 19]
     # indexes = list(range(11, 13))
 
     # Part-2 Download Songs by Album ID
-    download_album("1505850", indexes)
+    # download_album("1505850", indexes)
 
     # Part-3 Download Playlist
     # download_playlist("5453912201", indexes)

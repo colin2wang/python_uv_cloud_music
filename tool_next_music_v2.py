@@ -232,7 +232,7 @@ class NextMusicToolV2:
                     logger.info("\n==== Decryption Result ====")
                     logger.info(json.dumps(decrypted_data, indent=4, ensure_ascii=False))
                     if 'data' in decrypted_data and 'url' in decrypted_data['data']:
-                        logger.info(f"\n🎵 Song direct URL obtained successfully: {decrypted_data['data']['url']}")
+                        logger.info(f"\nSong direct URL obtained successfully: {decrypted_data['data']['url']}")
                         return decrypted_data
                 else:
                     logger.info("\n==== Parsing Result (Unencrypted) ====")

@@ -22,11 +22,10 @@ Usage:
 """
 
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from logging_config import setup_logger
-from process_album_cover_redownload import redownload_album_cover
-from process_album_lyrics_fix import fix_album_lyrics
+from process_album_artist_fix import fix_album_artists
 
 # Create logger
 logger = setup_logger(__name__)
@@ -216,7 +215,7 @@ def print_folders(folders: List[str], show_index: bool = False):
 
 def main():
     # Configuration: Set directory
-    target_directory = r"F:\我的音乐\我的专辑\华语流行"
+    target_directory = r"F:\我的音乐\我的专辑\欧美流行"
 
     # Output options
     show_index = True  # Whether to show index numbers
@@ -235,7 +234,7 @@ def main():
                 # fix_album_lyrics(folder)
 
                 # Redownload album cover.
-                redownload_album_cover(folder)
+                fix_album_artists(folder)
         else:
             # Normal mode: Show formatted output
             logger.info("Sort order: Default (Unicode)")

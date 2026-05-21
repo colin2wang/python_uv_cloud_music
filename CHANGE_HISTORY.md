@@ -21,6 +21,12 @@ This document records all significant changes to the Music Library Organizer pro
 
 ## 2026-05-21
 
+### Album Artist Tag & Filename Fixer
+
+Created `process_album_artist_fix.py` for batch fixing artist tags and filenames in album folders. Detects '/' separator in artist tags and converts to array format with ', ' delimiter. Rebuilds filenames based on corrected artist information following standard naming rules: "{index} - {artist} - {song_name}" or "{artist} - {song_name}". Intelligently parses original filenames to extract song name and track index, then reconstructs with proper artist formatting. Handles both '/' and '_' separators in filenames while preserving other underscores in song titles. Operates independently without API calls or CMUSIC_ID checks. Modified files: `process_album_artist_fix.py`, `process_cloud_music.py` (fixed NoneType error in ar_name handling).
+
+---
+
 ### Download Interval Control Implementation
 
 Implemented download interval control mechanism to prevent API rate limiting. Added `download_interval` configuration (default: 30s) in `config.yml`. Created `ensure_download_interval()` function that checks `last_download.txt` timestamp and waits if necessary to maintain configured interval between downloads. Added `update_last_download_timestamp()` function to record completion time after each download. Refactored waiting logic to reuse existing `random_sleep()` method for consistency. Modified `download_song_and_resources()` to call interval check at start and update timestamp at end. Ensures minimum 30-second gap between consecutive downloads. Modified files: `config.yml`, `config_manager.py`, `utils.py`, `process_cloud_music.py`.

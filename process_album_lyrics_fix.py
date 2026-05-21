@@ -929,7 +929,7 @@ if __name__ == "__main__":
 
     # Example 1: Fix single album folder
     # Provide your album folder path here
-    album_folder_path = r"F:\Workspaces\JetBrains\PyCharm\python_uv_cloud_music\downloads\许茹芸 - 好歌茹芸 (2011-05-13)"
+    album_folder_path = r"F:\我的音乐\我的专辑\华语流行\揽佬SKAI ISYOURGOD - 八方来财 (2024-08-20)"
     fix_album_lyrics(album_folder_path)
 
     # Example 2: Fix multiple album folders
