@@ -16,7 +16,7 @@ from logging_config import setup_logger
 from tool_next_music_v2 import NextMusicToolV2
 from utils import (
     get_audio_extension, get_image_mime_type,
-    get_mp4_image_format, clean_filename, random_sleep
+    get_mp4_image_format, clean_filename, random_sleep, ensure_download_interval, update_last_download_timestamp
 )
 
 # Create logger
@@ -413,6 +413,13 @@ def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> dict:
 
         retry_count = 0
         success = False
+        
+        # Cache for NextMusicTool API responses to avoid redundant calls during retries
+        next_music_cache = {
+            'song_info': None,
+            'song_url': None,
+            'song_lyric': None
+        }
 
         while retry_count <= max_retries and not success:
             try:
@@ -429,9 +436,32 @@ def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> dict:
                     if config.should_use_next_music_tool():
                         logger.info("Replacing song URL with NextMusicTool...")
                         next_music_tool = NextMusicToolV2()
-                        song_info_response = next_music_tool.get_song_info(song_id)
-                        song_url_response = next_music_tool.get_song_url(song_id, try_quality_level)
-                        song_lyric_response = next_music_tool.get_song_lyric(song_id)
+                        
+                        # Only call APIs if not already cached (first attempt or cache invalidated)
+                        if next_music_cache['song_info'] is None:
+                            logger.info("Fetching song info from NextMusic API...")
+                            next_music_cache['song_info'] = next_music_tool.get_song_info(song_id)
+                        else:
+                            logger.info(f"Cache hit for song info: {next_music_cache['song_info'].get('data', {}).get('name', 'N/A')}")
+                        
+                        if next_music_cache['song_url'] is None:
+                            logger.info(f"Fetching song URL from NextMusic API (quality: {try_quality_level})...")
+                            next_music_cache['song_url'] = next_music_tool.get_song_url(song_id, try_quality_level)
+                        else:
+                            url_data = next_music_cache['song_url'].get('data', {})
+                            logger.info(f"Cache hit for song URL: level={url_data.get('level', 'N/A')}, size={url_data.get('size', 'N/A')}")
+                        
+                        if next_music_cache['song_lyric'] is None:
+                            logger.info("Fetching song lyric from NextMusic API...")
+                            next_music_cache['song_lyric'] = next_music_tool.get_song_lyric(song_id)
+                        else:
+                            lyric_data = next_music_cache['song_lyric'].get('data', {})
+                            has_lyric = 'lrc' in lyric_data if lyric_data else False
+                            logger.info(f"Cache hit for song lyric: has_lyrics={has_lyric}")
+                        
+                        song_info_response = next_music_cache['song_info']
+                        song_url_response = next_music_cache['song_url']
+                        song_lyric_response = next_music_cache['song_lyric']
                         
                         # Check if song_url_response is valid
                         if (song_url_response and song_info_response and isinstance(song_url_response, dict)
@@ -466,6 +496,10 @@ def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> dict:
                             result_json['status'] = song_url_response.get('code')
                         else:
                             logger.error("NextMusicTool returned invalid song_url_response")
+                            # Invalidate cache on failure so next retry will re-fetch
+                            next_music_cache['song_info'] = None
+                            next_music_cache['song_url'] = None
+                            next_music_cache['song_lyric'] = None
                             retry_count += 1
                             continue
                     else:
@@ -903,6 +937,9 @@ def download_song_and_resources(
     Returns:
         bool: Whether download was successful
     """
+    # Ensure minimum interval between downloads
+    ensure_download_interval()
+    
     if not song_metadata or not song_metadata.get('success', True):
         logger.error("Invalid song metadata")
         return False
@@ -1051,8 +1088,9 @@ def download_song_and_resources(
 
     logger.info(f"Download completed! Files saved in: {download_dir}")
 
-    # Sleep for each download turns
-    random_sleep(min_delay=30.0, max_delay=35.0, reason="Sleeping for each download turns.")
+    # Update last download timestamp
+    update_last_download_timestamp()
+
     return True
 
 

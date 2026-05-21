@@ -69,6 +69,9 @@ network:
   # Number of retries for failed requests (default: 3)
   max_retries: 3
 
+  # Minimum interval between downloads in seconds (default: 30)
+  download_interval: 30
+
 # Logging Configuration
 logging:
   # Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)

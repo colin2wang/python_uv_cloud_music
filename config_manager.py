@@ -124,7 +124,8 @@ class ConfigManager:
                 'timeout': 30,
                 'random_delay_max': 2.5,
                 'api_delay_min': 1.0,
-                'max_retries': 3
+                'max_retries': 3,
+                'download_interval': 30
             },
             'logging': {
                 'level': 'INFO',
@@ -248,6 +249,10 @@ class ConfigManager:
     def get_max_retries(self) -> int:
         """Get maximum number of retries for failed requests"""
         return self.get('network.max_retries', 3)
+    
+    def get_download_interval(self) -> float:
+        """Get minimum interval between downloads in seconds"""
+        return self.get('network.download_interval', 30)
     
     def reload(self) -> dict:
         """

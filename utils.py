@@ -267,6 +267,75 @@ def random_sleep(max_delay: float = None, min_delay: float = 1.0, reason: str = 
     logger.info(f"Sleep completed.")
 
 
+def ensure_download_interval():
+    """
+    Ensure minimum interval between downloads by checking last_download.txt timestamp.
+    
+    This function should be called at the beginning of download_song_and_resources.
+    It reads the last download timestamp from last_download.txt and waits if necessary
+    to maintain the configured download interval.
+    """
+    import os
+    
+    last_download_file = Path("last_download.txt")
+    download_interval = config.get_download_interval()
+    
+    # Get current timestamp
+    current_time = time.time()
+    
+    # Check if last_download.txt exists
+    if last_download_file.exists():
+        try:
+            with open(last_download_file, 'r') as f:
+                last_timestamp = float(f.read().strip())
+            
+            # Calculate elapsed time since last download
+            elapsed_time = current_time - last_timestamp
+            
+            # If less than required interval, wait for the remaining time
+            if elapsed_time < download_interval:
+                wait_time = download_interval - elapsed_time
+                logger.info(f"Last download was {elapsed_time:.2f}s ago. Waiting {wait_time:.2f}s to maintain {download_interval}s interval...")
+                random_sleep(max_delay=wait_time, min_delay=wait_time, reason="Maintaining download interval")
+            else:
+                logger.info(f"Sufficient time has passed since last download ({elapsed_time:.2f}s >= {download_interval}s). No wait needed.")
+        except (ValueError, IOError) as e:
+            logger.warning(f"Error reading last_download.txt: {e}. Waiting full interval.")
+            # If file is corrupted, wait full interval
+            _wait_full_interval(download_interval)
+    else:
+        logger.info(f"No previous download record found. Waiting full interval ({download_interval}s)...")
+        _wait_full_interval(download_interval)
+
+
+def update_last_download_timestamp():
+    """
+    Update the last download timestamp in last_download.txt.
+    
+    This function should be called at the end of download_song_and_resources
+    to record when the current download completed.
+    """
+    last_download_file = Path("last_download.txt")
+    
+    try:
+        with open(last_download_file, 'w') as f:
+            f.write(str(time.time()))
+        logger.debug("Updated last_download.txt with current timestamp.")
+    except IOError as e:
+        logger.error(f"Failed to write last_download.txt: {e}")
+
+
+def _wait_full_interval(interval: float):
+    """
+    Wait for the full download interval.
+    
+    Args:
+        interval: Interval in seconds to wait
+    """
+    logger.info(f"Waiting {interval:.2f} seconds before starting download...")
+    random_sleep(max_delay=interval, min_delay=interval, reason="Initial download wait")
+
+
 def main():
     """
     Test function for random_sleep utility

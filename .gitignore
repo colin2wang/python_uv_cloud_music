@@ -8,5 +8,5 @@
 downloads/
 logs/
 
-# Last configuration file
-last_config.txt
+# Last metainfo files
+last_*.txt
