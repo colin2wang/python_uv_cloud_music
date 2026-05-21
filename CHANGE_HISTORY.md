@@ -4,6 +4,41 @@ This document records all significant changes to the Music Library Organizer pro
 
 ---
 
+## 2026-05-21
+
+### Random Sleep Enhancement with Progress Bar
+
+#### New Features
+- **Progress Bar for Wait Times**: Enhanced `random_sleep()` function with visual progress bar using `tqdm`
+  - Real-time countdown display during API rate limiting delays
+  - Shows elapsed time, remaining time, and completion percentage
+  - Displays reason for waiting (e.g., "Between processing songs", "API retry")
+  - Updates every 0.1 seconds for smooth progress visualization
+  - Maintains precise delay timing while providing user feedback
+
+#### Code Standardization
+- **Unified Sleep Mechanism**: Replaced all `time.sleep()` calls with `random_sleep()` across the codebase
+  - `process_album_lyrics_fix.py`: Converted 2 fixed-delay waits to use `random_sleep()`
+  - `tool_next_music_v2.py`: Converted 3 retry delays to use `random_sleep()` with appropriate ranges
+  - Ensures consistent rate limiting behavior throughout the application
+  - All waits now show progress bars and include descriptive reason strings
+
+#### Implementation Details
+- **Backward Compatibility**: Maintained existing API with optional `min_delay` parameter
+- **Flexible Configuration**: Supports both fixed delays (min=max) and random ranges
+- **Enhanced Logging**: Every wait operation logs its purpose for better debugging
+- **User Experience**: Visual progress feedback reduces uncertainty during long waits
+
+#### Files Modified
+- `utils.py`: Enhanced `random_sleep()` with tqdm progress bar integration
+- `process_album_lyrics_fix.py`: Replaced `time.sleep()` calls with `random_sleep()`
+- `tool_next_music_v2.py`: Replaced `time.sleep()` calls with `random_sleep()`
+
+#### Benefits
+Improved user experience during rate limiting periods, consistent wait behavior across all modules, better observability of delay reasons, and maintains compliance with API rate limiting policies through unified control
+
+---
+
 ## 2026-05-19
 
 ### Enhanced Rate Limiting & 429 Error Handling

@@ -11,6 +11,7 @@ from typing import Optional
 
 from config_manager import config
 from logging_config import setup_logger
+from tqdm import tqdm
 
 # Create logger for utils module
 logger = setup_logger(__name__)
@@ -247,4 +248,22 @@ def random_sleep(max_delay: float = None, min_delay: float = 1.0, reason: str = 
         max_delay = config.get_random_delay_max()
     delay = random.uniform(min_delay, max_delay)
     logger.info(f"Random sleeping for {delay:.2f} seconds (range: {min_delay:.2f}-{max_delay:.2f}s)... (Reason: {reason})")
-    time.sleep(delay)
+    
+    # Show progress bar during sleep
+    with tqdm(
+        total=int(delay * 10),
+        desc=f"Waiting ({reason})",
+        unit="0.1s",
+        ncols=100,
+        bar_format='{desc}: |{bar}| {percentage:3.0f}% [{elapsed}<{remaining}]'
+    ) as pbar:
+        elapsed = 0
+        step = 0.1  # Update every 0.1 seconds
+        while elapsed < delay:
+            time.sleep(step)
+            elapsed += step
+            pbar.update(1)
+        # Ensure we complete the full delay
+        remaining = delay - elapsed
+        if remaining > 0:
+            time.sleep(remaining)

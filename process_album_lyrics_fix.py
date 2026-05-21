@@ -11,7 +11,7 @@ from mutagen.mp4 import MP4
 from config_manager import config
 from logging_config import setup_logger
 from process_cloud_music import get_song_ids_by_album_id, get_song_metadata_by_song_id
-from utils import clean_filename
+from utils import clean_filename, random_sleep
 
 # Create logger
 logger = setup_logger(__name__)
@@ -755,9 +755,8 @@ class AlbumLyricFixer:
 
             # Add delay between requests to avoid rate limiting
             if idx < len(self.songs_metadata):
-                delay = 2.0  # seconds
-                logger.info(f"Waiting {delay} seconds before next song...")
-                time.sleep(delay)
+                logger.info(f"Waiting before next song...")
+                random_sleep(min_delay=2.0, max_delay=2.0, reason="Between processing songs in album")
         
         # Step 5: Process music files without CMUSIC_ID that weren't matched above
         logger.info("-" * 60)
@@ -848,9 +847,8 @@ class AlbumLyricFixer:
                             })
                             
                             # Add delay
-                            delay = 2.0
-                            logger.info(f"Waiting {delay} seconds before next file...")
-                            time.sleep(delay)
+                            logger.info(f"Waiting before next file...")
+                            random_sleep(min_delay=2.0, max_delay=2.0, reason="Between processing files in album")
                         else:
                             logger.error(f"  ✗ Failed to write lyric to: {file_path.name}")
                             results['songs_failed'] += 1

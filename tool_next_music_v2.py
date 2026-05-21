@@ -132,9 +132,8 @@ class NextMusicToolV2:
                 last_error = e
                 logger.error(f"Attempt {attempt}/{max_retries} failed: {str(e)}")
                 if attempt < max_retries:
-                    wait_time = round(random.uniform(10, 20), 1)  # Random between 10-20 seconds, precise to 0.1s
-                    logger.info(f"Waiting {wait_time} seconds before retry...")
-                    time.sleep(wait_time)
+                    logger.info(f"Waiting before retry...")
+                    random_sleep(min_delay=10.0, max_delay=20.0, reason="Next Music Tool get_song_info retrying...")
                 else:
                     logger.error(f"Maximum retry count reached ({max_retries})")
         
@@ -187,9 +186,8 @@ class NextMusicToolV2:
                 last_error = e
                 logger.error(f"Attempt {attempt}/{max_retries} failed: {str(e)}")
                 if attempt < max_retries:
-                    wait_time = round(random.uniform(10, 20), 1)  # Random between 10-20 seconds, precise to 0.1s
-                    logger.info(f"Waiting {wait_time} seconds before retry...")
-                    time.sleep(wait_time)
+                    logger.info(f"Waiting before retry...")
+                    random_sleep(min_delay=10.0, max_delay=20.0, reason="Next Music Tool get_song_lyric retrying...")
                 else:
                     logger.error(f"Maximum retry count reached ({max_retries})")
         
@@ -247,9 +245,8 @@ class NextMusicToolV2:
                 last_error = e
                 logger.error(f"Attempt {attempt}/{max_retries} failed: {str(e)}")
                 if attempt < max_retries:
-                    wait_time = round(random.uniform(10, 20), 1)  # Random between 10-20 seconds, precise to 0.1s
-                    logger.info(f"Waiting {wait_time} seconds before retry...")
-                    time.sleep(wait_time)
+                    logger.info(f"Waiting before retry...")
+                    random_sleep(min_delay=10.0, max_delay=20.0, reason="Next Music Tool get_song_url retrying...")
                 else:
                     logger.error(f"Maximum retry count reached ({max_retries})")
         
