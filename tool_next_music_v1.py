@@ -3,16 +3,16 @@ NextMusic Tool - A class-based wrapper for NextMusic API with AES-GCM encryption
 """
 import base64
 import json
-import time
 import os
+import time
 
 import requests
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.backends import default_backend
 
-from logging_config import setup_logger
-from utils import random_sleep
+from util_commons import random_sleep
+from util_database import MusicDB
+from util_logging import setup_logger
+from model.basic import MusicURL
 
 # Create logger
 logger = setup_logger(__name__)
@@ -41,10 +41,16 @@ class NextMusicTool:
         "priority": "u=1, i",
     }
 
-    def __init__(self):
-        """Initialize NextMusicTool"""
+    def __init__(self, db_path: str = None):
+        """Initialize NextMusicTool with database connection
+        
+        Args:
+            db_path: Path to SQLite database file. Defaults to 'cloud-music.db'
+        """
         self.key_data = None
         self.key_expiry_time = 0
+        self.db = MusicDB(db_path)
+        logger.info("NextMusicTool initialized with database caching")
 
     def _get_encryption_key(self) -> dict:
         """
@@ -197,17 +203,27 @@ class NextMusicTool:
             logger.error(f"Error decrypting data: {e}", exc_info=True)
             return None
 
-    def get_song_url(self, song_id: str | int, level: str = "lossless") -> dict:
+    def get_song_url(self, song_id: str | int, level: str = "lossless") -> MusicURL:
         """
-        Get song URL from NextMusic API with AES-GCM encryption
+        Get song URL from NextMusic API with AES-GCM encryption and database caching
         
         Args:
             song_id: Song ID
             level: Audio quality level (default: lossless)
         
         Returns:
-            API response as dictionary
+            MusicURL object containing music_id, quality, and url
         """
+        # Check database first
+        try:
+            song_id_int = int(song_id)
+            cached_url = self.db.get_music_url(song_id_int, level)
+            if cached_url:
+                logger.info(f"Cache hit for song URL (SongID: {song_id}, Quality: {level})")
+                return MusicURL(music_id=song_id_int, quality=level, url=cached_url)
+        except Exception as e:
+            logger.warning(f"Failed to query cache: {str(e)}")
+        
         retry = 0
         
         while retry <= MAX_RETRY:
@@ -259,17 +275,44 @@ class NextMusicTool:
                     logger.debug(f"Ciphertext preview: {response_json['ciphertext'][:100]}...")
                 
                 # Step 4: Decrypt response if it's encrypted
+                result = None
                 if response_json.get('ciphertext'):
                     decrypted_data = self._decrypt_data(response_json['ciphertext'], key)
                     if decrypted_data:
                         logger.info(f"Finish get song URL for ID: {decrypted_data.get('data', {}).get('id', song_id)}")
-                        return decrypted_data
+                        # Extract model fields only, discard other values
+                        data = decrypted_data.get('data', {})
+                        result = MusicURL(
+                            music_id=int(data.get('id', song_id)),
+                            quality=data.get('level', level),
+                            url=data.get('url')
+                        )
                     else:
                         raise Exception("Response decryption failed")
                 else:
                     # Response is not encrypted
                     logger.info(f"Finish get song URL for ID: {response_json.get('data', {}).get('id', song_id)}")
-                    return response_json
+                    # Extract model fields only, discard other values
+                    data = response_json.get('data', {})
+                    result = MusicURL(
+                        music_id=int(data.get('id', song_id)),
+                        quality=data.get('level', level),
+                        url=data.get('url')
+                    )
+                
+                # Save to database before returning
+                if result:
+                    try:
+                        self.db.upsert_music_url(
+                            music_id=result.music_id,
+                            quality=result.quality,
+                            url=result.url
+                        )
+                        logger.info(f"Saved song URL to database (SongID: {result.music_id}, Quality: {result.quality})")
+                    except Exception as e:
+                        logger.error(f"Failed to save URL to database: {str(e)}")
+                    
+                    return result
                     
             except requests.exceptions.RequestException as e:
                 if retry >= MAX_RETRY:
@@ -284,8 +327,8 @@ class NextMusicTool:
                 retry += 1
                 logger.error(f"Error processing NextMusic API request: {e}, retry {retry}/{MAX_RETRY}")
         
-        # Return consistent error format when all retries fail
-        return {"code": 500, "message": "Failed to get song URL after retries", "data": None}
+        # Return None when all retries fail
+        return None
 
 
 if __name__ == "__main__":

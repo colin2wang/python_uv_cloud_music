@@ -11,10 +11,12 @@ from mutagen.id3 import ID3, TIT2, TPE1, TALB, APIC, COMM, TYER
 from mutagen.mp4 import MP4, MP4Cover
 from tqdm import tqdm
 
-from config_manager import config
-from logging_config import setup_logger
+from util_config import config
+from util_logging import setup_logger
 from tool_next_music_v2 import NextMusicToolV2
-from utils import (
+from model.basic import MusicInfo, MusicURL
+from model.extra import SongMetadata, AlbumMetadata, PlaylistMetadata
+from util_commons import (
     get_audio_extension, get_image_mime_type,
     get_mp4_image_format, clean_filename, random_sleep, ensure_download_interval, update_last_download_timestamp
 )
@@ -183,7 +185,7 @@ class MusicToolAPI:
 # TRY_QUALITY_LEVELS = ["lossless", "exhigh", "standard"]
 TRY_QUALITY_LEVELS = ["standard"]
 
-def get_song_ids_by_playlist_id(playlist_id: str) -> dict:
+def get_song_ids_by_playlist_id(playlist_id: str) -> PlaylistMetadata:
     """
     Extract song IDs from playlist ID.
 
@@ -191,7 +193,7 @@ def get_song_ids_by_playlist_id(playlist_id: str) -> dict:
         playlist_id: Playlist ID (e.g., "70512345")
 
     Returns:
-        Dictionary containing playlist information and song ID list
+        PlaylistMetadata object containing playlist information and song list
     """
     api = MusicToolAPI(config.get_api_base_url())
 
@@ -209,22 +211,18 @@ def get_song_ids_by_playlist_id(playlist_id: str) -> dict:
 
         if playlist_result.get('status') != 200:
             logger.error(f"\nPlaylist parsing failed: {playlist_result.get('message', 'Unknown error')}")
-            return {
-                "success": False,
-                "message": playlist_result.get('message', 'Playlist parsing failed'),
-                "playlist_id": playlist_id
-            }
+            return None
 
         # Extract playlist data section
         data_section = playlist_result.get('data', {})
         if not data_section:
             logger.error(f"\nData section not found")
-            return {"success": False, "message": "Data section not found", "playlist_id": playlist_id}
+            return None
 
         playlist_info = data_section.get('playlist', {})
         if not playlist_info:
             logger.error(f"\nPlaylist info not found")
-            return {"success": False, "message": "Playlist info not found", "playlist_id": playlist_id}
+            return None
 
         playlist_name = playlist_info.get('name', 'Unknown Playlist')
         playlist_creator = playlist_info.get('creator', 'Unknown Creator')
@@ -259,29 +257,25 @@ def get_song_ids_by_playlist_id(playlist_id: str) -> dict:
             else:
                 logger.warning(f"{i:2d}. Invalid song data: {song}")
 
-        result = {
-            "success": True,
-            "playlist_id": playlist_id,
-            "playlist_name": playlist_name,
-            "playlist_creator": playlist_creator,
-            "song_count": len(song_ids),
-            "song_ids": song_ids,
-            "song_details": song_details,
-            "raw_data": playlist_result
-        }
-
         logger.info(f"\nSuccessfully extracted {len(song_ids)} song IDs")
-        return result
+        return PlaylistMetadata(
+            playlist_id=playlist_id,
+            playlist_name=playlist_name,
+            playlist_creator=playlist_creator,
+            song_count=len(song_ids),
+            song_ids=song_ids,
+            song_details=song_details
+        )
 
     except json.JSONDecodeError as e:
         logger.error(f"\nJSON parsing failed: {str(e)}")
-        return {"success": False, "message": f"JSON parsing failed: {str(e)}", "playlist_id": playlist_id}
+        return None
     except Exception as e:
         logger.error(f"\nError occurred during processing: {str(e)}")
-        return {"success": False, "message": f"Processing failed: {str(e)}", "playlist_id": playlist_id}
+        return None
 
 
-def get_song_ids_by_album_id(album_id: str) -> dict:
+def get_song_ids_by_album_id(album_id: str) -> AlbumMetadata:
     """
     Extract song IDs from album ID.
 
@@ -289,7 +283,7 @@ def get_song_ids_by_album_id(album_id: str) -> dict:
         album_id: Album ID (e.g., "361790100")
 
     Returns:
-        Dictionary containing album information and song ID list
+        AlbumMetadata object containing album information and song list
     """
     api = MusicToolAPI(config.get_api_base_url())
 
@@ -307,17 +301,13 @@ def get_song_ids_by_album_id(album_id: str) -> dict:
 
         if album_result.get('status') != 200:
             logger.error(f"\nAlbum parsing failed: {album_result.get('message', 'Unknown error')}")
-            return {
-                "success": False,
-                "message": album_result.get('message', 'Album parsing failed'),
-                "album_id": album_id
-            }
+            return None
 
         # Extract album data
         album_data = album_result.get('data', {}).get('album', {})
         if not album_data:
             logger.error(f"\nAlbum data not found")
-            return {"success": False, "message": "Album data not found", "album_id": album_id}
+            return None
 
         album_name = album_data.get('name', 'Unknown Album')
         album_artist = album_data.get('artist', 'Unknown Artist')
@@ -354,30 +344,26 @@ def get_song_ids_by_album_id(album_id: str) -> dict:
             else:
                 logger.warning(f"{i:2d}. Invalid song data: {song}")
 
-        result = {
-            "success": True,
-            "album_id": album_id,
-            "album_name": album_name,
-            "album_artist": album_artist,
-            "album_publish_time": album_publish_time,
-            "song_count": len(song_ids),
-            "song_ids": song_ids,
-            "song_details": song_details,
-            "raw_data": album_result
-        }
-
         logger.info(f"\nSuccessfully extracted {len(song_ids)} song IDs")
-        return result
+        return AlbumMetadata(
+            album_id=album_id,
+            album_name=album_name,
+            album_artist=album_artist,
+            album_publish_time=album_publish_time,
+            song_count=len(song_ids),
+            song_details=song_details,
+            raw_data=album_result
+        )
 
     except json.JSONDecodeError as e:
         logger.error(f"\nJSON parsing failed: {str(e)}")
-        return {"success": False, "message": f"JSON parsing failed: {str(e)}", "album_id": album_id}
+        return None
     except Exception as e:
         logger.error(f"\nError occurred during processing: {str(e)}")
-        return {"success": False, "message": f"Processing failed: {str(e)}", "album_id": album_id}
+        return None
 
 
-def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> dict:
+def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> tuple:
     """
     Extract song information by song ID.
 
@@ -386,7 +372,7 @@ def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> dict:
         level: Quality level (standard, exhigh, lossless, hires)
 
     Returns:
-        Dictionary containing detailed song information with download links
+        Tuple of (MusicInfo, MusicURL, SongMetadata) or None on failure
     """
     try:
         api = MusicToolAPI(config.get_api_base_url())
@@ -442,60 +428,50 @@ def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> dict:
                             logger.info("Fetching song info from NextMusic API...")
                             next_music_cache['song_info'] = next_music_tool.get_song_info(song_id)
                         else:
-                            logger.info(f"Cache hit for song info: {next_music_cache['song_info'].get('data', {}).get('name', 'N/A')}")
+                            logger.info(f"Cache hit for song info: {next_music_cache['song_info'].title or 'N/A'}")
                         
                         if next_music_cache['song_url'] is None:
                             logger.info(f"Fetching song URL from NextMusic API (quality: {try_quality_level})...")
                             next_music_cache['song_url'] = next_music_tool.get_song_url(song_id, try_quality_level)
                         else:
-                            url_data = next_music_cache['song_url'].get('data', {})
-                            logger.info(f"Cache hit for song URL: level={url_data.get('level', 'N/A')}, size={url_data.get('size', 'N/A')}")
+                            logger.info(f"Cache hit for song URL: level={next_music_cache['song_url'].quality}, url={'present' if next_music_cache['song_url'].url else 'None'}")
                         
                         if next_music_cache['song_lyric'] is None:
                             logger.info("Fetching song lyric from NextMusic API...")
                             next_music_cache['song_lyric'] = next_music_tool.get_song_lyric(song_id)
                         else:
-                            lyric_data = next_music_cache['song_lyric'].get('data', {})
-                            has_lyric = 'lrc' in lyric_data if lyric_data else False
+                            has_lyric = bool(next_music_cache['song_lyric'])
                             logger.info(f"Cache hit for song lyric: has_lyrics={has_lyric}")
                         
-                        song_info_response = next_music_cache['song_info']
-                        song_url_response = next_music_cache['song_url']
-                        song_lyric_response = next_music_cache['song_lyric']
+                        song_info_model = next_music_cache['song_info']
+                        song_url_model = next_music_cache['song_url']
+                        song_lyric_str = next_music_cache['song_lyric']
                         
-                        # Check if song_url_response is valid
-                        if (song_url_response and song_info_response and isinstance(song_url_response, dict)
-                                and isinstance(song_info_response, dict)):
-                            # Merge song info and song url data
-                            song_info_data = song_info_response.get('data', {})
-                            song_url_data = song_url_response.get('data', {})
-                            
+                        # Check if models are valid
+                        if song_url_model and song_info_model and isinstance(song_url_model, MusicURL) and isinstance(song_info_model, MusicInfo):
+                            # Build result_json from model objects
                             result_json['data'] = {
-                                'url': song_url_data.get('url'),
-                                'level': song_url_data.get('level'),
-                                'size': song_url_data.get('size'),
-                                'name': song_info_data.get('name'),
-                                'ar_name': song_info_data.get('singer', '').replace('/', ', ') if song_info_data.get('singer') else '',
-                                'al_name': song_info_data.get('album'),
-                                'pic': song_info_data.get('picimg'),
-                                'id': song_info_data.get('id'),
-                                'duration': song_info_data.get('duration')
+                                'url': song_url_model.url,
+                                'level': song_url_model.quality,
+                                'size': None,  # Size not in MusicURL model, will be fetched from API response
+                                'name': song_info_model.title,
+                                'ar_name': song_info_model.artist.replace('/', ', ') if song_info_model.artist else '',
+                                'al_name': song_info_model.album,
+                                'pic': song_info_model.cover_url,  # Use cover_url directly
+                                'id': str(song_info_model.music_id),
+                                'duration': song_info_model.duration
                             }
                             
                             # Add lyrics if available
-                            if song_lyric_response and isinstance(song_lyric_response, dict):
-                                lyric_data = song_lyric_response.get('data', {})
-                                if lyric_data and 'lrc' in lyric_data:
-                                    result_json['data']['lyric'] = lyric_data['lrc']
-                                    logger.info(f"Lyrics retrieved successfully for song {song_id}")
-                                else:
-                                    logger.warning(f"No lyrics found for song {song_id}")
+                            if song_lyric_str:
+                                result_json['data']['lyric'] = song_lyric_str
+                                logger.info(f"Lyrics retrieved successfully for song {song_id}")
                             else:
-                                logger.warning(f"Failed to retrieve lyrics for song {song_id}")
+                                logger.warning(f"No lyrics found for song {song_id}")
                             
-                            result_json['status'] = song_url_response.get('code')
+                            result_json['status'] = 200
                         else:
-                            logger.error("NextMusicTool returned invalid song_url_response")
+                            logger.error("NextMusicTool returned invalid song_url_response or song_info_response")
                             # Invalidate cache on failure so next retry will re-fetch
                             next_music_cache['song_info'] = None
                             next_music_cache['song_url'] = None
@@ -1289,14 +1265,19 @@ def download_album(album_id: str, index_ids: list, level: str = "lossless"):
     if level is None:
         level = config.get_default_quality()
     album_metadata = get_song_ids_by_album_id(album_id)
+    
+    # Check if album_metadata is valid
+    if album_metadata is None:
+        logger.error("Failed to get album metadata")
+        return
 
     # Create album folder, description file, and cover picture
-    prepare_album_folder(album_metadata)
+    prepare_album_folder(album_metadata.to_dict())
 
     index = 0
     failed_indexes = []  # Track failed song indexes
-    for song_id in album_metadata['song_ids']:
-        song_detail = album_metadata['song_details'][index]
+    for song_detail in album_metadata.song_details:
+        song_id = song_detail['id']
         song_index = song_detail['index']
         logger.info(f"{index + 1}. {song_detail}")
 
@@ -1304,20 +1285,20 @@ def download_album(album_id: str, index_ids: list, level: str = "lossless"):
             if song_index in index_ids:
                 logger.info(f"{song_index} is in the {index_ids}, continue downloading...")
                 metadata = get_song_metadata_by_song_id(song_id, level)
-                success = download_song_and_resources(metadata, idx=song_index, current_index=index + 1, total_count=len(album_metadata['song_ids']))
+                success = download_song_and_resources(metadata, idx=song_index, current_index=index + 1, total_count=len(album_metadata.song_details))
                 if not success:
                     failed_indexes.append(song_index)
             else:
                 logger.info(f"{song_index} is not in the {index_ids}, skipping downloading...")
         else:
             metadata = get_song_metadata_by_song_id(song_id, level)
-            success = download_song_and_resources(metadata, idx=song_index, current_index=index + 1, total_count=len(album_metadata['song_ids']))
+            success = download_song_and_resources(metadata, idx=song_index, current_index=index + 1, total_count=len(album_metadata.song_details))
             if not success:
                 failed_indexes.append(song_index)
         index += 1
 
-    album_artist = album_metadata['album_artist']
-    album_name = album_metadata['album_name']
+    album_artist = album_metadata.album_artist
+    album_name = album_metadata.album_name
     logger.info(f"Completed downloading album: {album_artist} - {album_name}")
     logger.info(f"Total downloaded: {index}")
     
@@ -1354,10 +1335,16 @@ def download_playlist(playlist_id: str, index_ids: list, level: str = "lossless"
     if level is None:
         level = config.get_default_quality()
     playlist_metadata = get_song_ids_by_playlist_id(playlist_id)
+    
+    # Check if playlist_metadata is valid
+    if playlist_metadata is None:
+        logger.error("Failed to get playlist metadata")
+        return
+    
     index = 0
     failed_indexes = []  # Track failed song indexes
-    for song_id in playlist_metadata['song_ids']:
-        song_detail = playlist_metadata['song_details'][index]
+    for song_id in playlist_metadata.song_ids:
+        song_detail = playlist_metadata.song_details[index]
         song_index = song_detail['index']
         logger.info(f"{index + 1}. {song_detail}")
 
@@ -1365,14 +1352,14 @@ def download_playlist(playlist_id: str, index_ids: list, level: str = "lossless"
             if song_index in index_ids:
                 logger.info(f"{song_index} is in the {index_ids}, continue downloading...")
                 metadata = get_song_metadata_by_song_id(song_id, level)
-                success = download_song_and_resources(metadata, idx=None, current_index=index + 1, total_count=len(playlist_metadata['song_ids']))
+                success = download_song_and_resources(metadata, idx=None, current_index=index + 1, total_count=len(playlist_metadata.song_ids))
                 if not success:
                     failed_indexes.append(song_index)
             else:
                 logger.info(f"{song_index} is not in the {index_ids}, skipping downloading...")
         else:
             metadata = get_song_metadata_by_song_id(song_id, level)
-            success = download_song_and_resources(metadata, idx=None, current_index=index + 1, total_count=len(playlist_metadata['song_ids']))
+            success = download_song_and_resources(metadata, idx=None, current_index=index + 1, total_count=len(playlist_metadata.song_ids))
             if not success:
                 failed_indexes.append(song_index)
         index += 1

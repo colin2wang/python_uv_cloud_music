@@ -9,12 +9,16 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from config_manager import config
-from logging_config import setup_logger
+from util_config import config
+from util_logging import setup_logger
 from tqdm import tqdm
+from util_database import MusicDB
 
 # Create logger for utils module
 logger = setup_logger(__name__)
+
+# Database instance
+db = MusicDB()
 
 # Supported audio formats
 AUDIO_EXTENSIONS = {'.mp3', '.mp2', '.mp1', '.flac', '.m4a', '.mp4', '.aac'}
@@ -269,25 +273,25 @@ def random_sleep(max_delay: float = None, min_delay: float = 1.0, reason: str = 
 
 def ensure_download_interval():
     """
-    Ensure minimum interval between downloads by checking last_download.txt timestamp.
+    Ensure minimum interval between downloads by checking database timestamp.
     
     This function should be called at the beginning of download_song_and_resources.
-    It reads the last download timestamp from last_download.txt and waits if necessary
+    It reads the last download timestamp from database and waits if necessary
     to maintain the configured download interval.
     """
     import os
     
-    last_download_file = Path("last_download.txt")
     download_interval = config.get_download_interval()
     
     # Get current timestamp
     current_time = time.time()
     
-    # Check if last_download.txt exists
-    if last_download_file.exists():
+    # Check if last download timestamp exists in database
+    last_timestamp_str = db.get_config('last_download_timestamp')
+    
+    if last_timestamp_str:
         try:
-            with open(last_download_file, 'r') as f:
-                last_timestamp = float(f.read().strip())
+            last_timestamp = float(last_timestamp_str)
             
             # Calculate elapsed time since last download
             elapsed_time = current_time - last_timestamp
@@ -299,9 +303,9 @@ def ensure_download_interval():
                 random_sleep(max_delay=wait_time, min_delay=wait_time, reason="Maintaining download interval")
             else:
                 logger.info(f"Sufficient time has passed since last download ({elapsed_time:.2f}s >= {download_interval}s). No wait needed.")
-        except (ValueError, IOError) as e:
-            logger.warning(f"Error reading last_download.txt: {e}. Waiting full interval.")
-            # If file is corrupted, wait full interval
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Error parsing last download timestamp: {e}. Waiting full interval.")
+            # If timestamp is corrupted, wait full interval
             _wait_full_interval(download_interval)
     else:
         logger.info(f"No previous download record found. Waiting full interval ({download_interval}s)...")
@@ -310,19 +314,17 @@ def ensure_download_interval():
 
 def update_last_download_timestamp():
     """
-    Update the last download timestamp in last_download.txt.
+    Update the last download timestamp in database.
     
     This function should be called at the end of download_song_and_resources
     to record when the current download completed.
     """
-    last_download_file = Path("last_download.txt")
-    
     try:
-        with open(last_download_file, 'w') as f:
-            f.write(str(time.time()))
-        logger.debug("Updated last_download.txt with current timestamp.")
-    except IOError as e:
-        logger.error(f"Failed to write last_download.txt: {e}")
+        current_timestamp = str(time.time())
+        db.upsert_config('last_download_timestamp', current_timestamp)
+        logger.debug("Updated last download timestamp in database.")
+    except Exception as e:
+        logger.error(f"Failed to write last download timestamp to database: {e}")
 
 
 def _wait_full_interval(interval: float):

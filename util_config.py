@@ -9,7 +9,7 @@ from typing import Any
 
 import yaml
 
-from logging_config import setup_logger
+from util_logging import setup_logger
 
 logger = setup_logger(__name__)
 

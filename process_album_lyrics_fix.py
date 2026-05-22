@@ -8,10 +8,10 @@ from mutagen.flac import FLAC
 from mutagen.id3 import ID3, COMM
 from mutagen.mp4 import MP4
 
-from config_manager import config
-from logging_config import setup_logger
+from util_config import config
+from util_logging import setup_logger
 from process_cloud_music import get_song_ids_by_album_id, get_song_metadata_by_song_id
-from utils import clean_filename, random_sleep
+from util_commons import clean_filename, random_sleep
 
 # Create logger
 logger = setup_logger(__name__)
@@ -448,7 +448,7 @@ class AlbumLyricFixer:
         Returns:
             tuple: (bool indicating if all files have CMUSIC_ID, list of music files found, set of filenames with CMUSIC_ID)
         """
-        from utils import AUDIO_EXTENSIONS
+        from util_commons import AUDIO_EXTENSIONS
 
         # Find all music files in album folder
         music_files = []

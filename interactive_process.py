@@ -7,33 +7,34 @@ import sys
 import json
 from pathlib import Path
 
-from logging_config import setup_logger
+from util_logging import setup_logger
 from process_cloud_music import download_song, download_album, download_playlist
+from util_database import MusicDB
 
 # Create logger
 logger = setup_logger(__name__)
 
-# Last config file path
-LAST_CONFIG_FILE = Path(__file__).parent / 'last_config.txt'
+# Database instance
+db = MusicDB()
 
 
 def load_last_config() -> dict:
     """
-    Load last used configuration from file.
+    Load last used configuration from database.
     
     Returns:
         Dictionary containing last configuration values
     """
     try:
-        if LAST_CONFIG_FILE.exists():
-            with open(LAST_CONFIG_FILE, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-                logger.info(f"Loaded last configuration from {LAST_CONFIG_FILE}")
-                return config
+        config_json = db.get_config('last_download_config')
+        if config_json:
+            config = json.loads(config_json)
+            logger.info("Loaded last configuration from database")
+            return config
     except Exception as e:
-        logger.warning(f"Failed to load last config: {e}")
+        logger.warning(f"Failed to load last config from database: {e}")
     
-    # Return default config if file doesn't exist or error occurred
+    # Return default config if not found or error occurred
     return {
         'method': 1,
         'quality': 'lossless'
@@ -42,17 +43,17 @@ def load_last_config() -> dict:
 
 def save_last_config(config: dict):
     """
-    Save current configuration to file for next use.
+    Save current configuration to database.
     
     Args:
         config: Dictionary containing configuration values to save
     """
     try:
-        with open(LAST_CONFIG_FILE, 'w', encoding='utf-8') as f:
-            json.dump(config, f, ensure_ascii=False, indent=2)
-        logger.info(f"Saved configuration to {LAST_CONFIG_FILE}")
+        config_json = json.dumps(config, ensure_ascii=False, indent=2)
+        db.upsert_config('last_download_config', config_json)
+        logger.info("Saved configuration to database")
     except Exception as e:
-        logger.warning(f"Failed to save last config: {e}")
+        logger.warning(f"Failed to save last config to database: {e}")
 
 
 def parse_indexes(input_str: str) -> list:
