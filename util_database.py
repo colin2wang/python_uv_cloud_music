@@ -1,13 +1,14 @@
 """
 SQLite Database Manager for Music Library
 
-Provides database operations for music_info and music_url tables.
+Provides database operations for music_info table and in-memory URL caching.
 Supports query by id/quality and upsert operations.
 """
 import sqlite3
 from pathlib import Path
 from typing import Optional, Dict, List
 from contextlib import contextmanager
+import threading
 
 from util_logging import setup_logger
 
@@ -16,24 +17,29 @@ logger = setup_logger(__name__)
 
 class MusicDB:
     """
-    Simple SQLite database manager for music information and URLs.
+    Simple SQLite database manager for music information with in-memory URL caching.
     
     Tables:
         - music_info: Stores music metadata (music_id, artist, title, album, lyrics)
-        - music_url: Stores download URLs by quality (music_id, quality, url)
         - config: Stores configuration key-value pairs (name, value)
+    
+    In-memory cache:
+        - _url_cache: Dictionary mapping (music_id, quality) to URL
     """
     
     def __init__(self, db_path: str | Path = None):
         """
-        Initialize database connection.
+        Initialize database connection and in-memory URL cache.
         
         Args:
             db_path: Path to SQLite database file. Defaults to 'music_library.db'
         """
         self.db_path = Path(db_path) if db_path else Path.cwd() / 'cloud-music.db'
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._initialize_tables()
+        # self._initialize_tables()
+        # In-memory URL cache: {(music_id, quality): url}
+        self._url_cache = {}
+        self._url_cache_lock = threading.Lock()
         logger.info(f"Database initialized: {self.db_path}")
     
     @contextmanager
@@ -63,14 +69,6 @@ class MusicDB:
                     cover_url TEXT,
                     lyrics TEXT,
                     duration INTEGER
-                )
-            """)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS music_url (
-                    music_id INTEGER NOT NULL,
-                    quality TEXT NOT NULL,
-                    url TEXT,
-                    PRIMARY KEY (music_id, quality)
                 )
             """)
             conn.execute("""
@@ -120,7 +118,7 @@ class MusicDB:
     
     def upsert_music_url(self, music_id: int, quality: str, url: str) -> bool:
         """
-        Insert or update music URL for specific quality.
+        Insert or update music URL for specific quality using in-memory cache.
         
         Args:
             music_id: Unique music identifier
@@ -130,15 +128,10 @@ class MusicDB:
         Returns:
             True if successful
         """
-        with self._get_connection() as conn:
-            conn.execute("""
-                INSERT INTO music_url (music_id, quality, url)
-                VALUES (?, ?, ?)
-                ON CONFLICT(music_id, quality) DO UPDATE SET
-                    url = excluded.url
-            """, (music_id, quality, url))
+        with self._url_cache_lock:
+            self._url_cache[(music_id, quality)] = url
         
-        logger.info(f"Upserted music_url: id={music_id}, quality={quality}")
+        logger.info(f"Upserted music_url to cache: id={music_id}, quality={quality}")
         return True
     
     def upsert_batch_urls(self, music_id: int, urls: Dict[str, str]) -> int:
@@ -191,7 +184,7 @@ class MusicDB:
     
     def get_music_url(self, music_id: int, quality: str) -> Optional[str]:
         """
-        Query music URL by ID and quality.
+        Query music URL by ID and quality from in-memory cache.
         
         Args:
             music_id: Unique music identifier
@@ -200,16 +193,8 @@ class MusicDB:
         Returns:
             URL string or None if not found
         """
-        with self._get_connection() as conn:
-            cursor = conn.execute(
-                "SELECT url FROM music_url WHERE music_id = ? AND quality = ?",
-                (music_id, quality)
-            )
-            row = cursor.fetchone()
-        
-        if row:
-            return row['url']
-        return None
+        with self._url_cache_lock:
+            return self._url_cache.get((music_id, quality))
     
     def get_all_music_urls(self, music_id: int) -> Dict[str, str]:
         """
