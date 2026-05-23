@@ -275,11 +275,11 @@ class NextMusicToolV2:
             except Exception as e:
                 last_error = e
                 logger.error(f"Attempt {attempt}/{max_retries} failed: {str(e)}")
-                if attempt < max_retries:
-                    logger.info(f"Waiting before retry...")
-                    random_sleep(min_delay=10.0, max_delay=20.0, reason="Next Music Tool get_song_lyric retrying...")
-                else:
-                    logger.error(f"Maximum retry count reached ({max_retries})")
+                # if attempt < max_retries:
+                #     logger.info(f"Waiting before retry...")
+                #     random_sleep(min_delay=10.0, max_delay=20.0, reason="Next Music Tool get_song_lyric retrying...")
+                # else:
+                #     logger.error(f"Maximum retry count reached ({max_retries})")
         
         logger.error(f"All retries failed, last error: {str(last_error)}")
         return None
@@ -386,11 +386,11 @@ class NextMusicToolV2:
             except Exception as e:
                 last_error = e
                 logger.error(f"Attempt {attempt}/{max_retries} failed: {str(e)}")
-                if attempt < max_retries:
-                    logger.info(f"Waiting before retry...")
-                    random_sleep(min_delay=10.0, max_delay=20.0, reason="Next Music Tool get_song_url retrying...")
-                else:
-                    logger.error(f"Maximum retry count reached ({max_retries})")
+                # if attempt < max_retries:
+                #     logger.info(f"Waiting before retry...")
+                #     random_sleep(min_delay=10.0, max_delay=20.0, reason="Next Music Tool get_song_url retrying...")
+                # else:
+                #     logger.error(f"Maximum retry count reached ({max_retries})")
         
         logger.error(f"All retries failed, last error: {str(last_error)}")
         return None

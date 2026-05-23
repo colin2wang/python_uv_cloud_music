@@ -33,6 +33,10 @@ Enhanced download interval control mechanism with database-based timestamp stora
 
 ---
 
+### API Call Optimization
+
+Optimized API call execution by moving `api.parse_song()` call from general execution flow to the else block of `config.should_use_next_music_tool()` condition. This prevents unnecessary API calls when Next Music Tool is enabled, improving efficiency and reducing API usage. When Next Music Tool is configured, the application now bypasses the original API call entirely, relying solely on Next Music Tool data. When Next Music Tool is disabled, the original API call executes as before. Modified file: `process_cloud_music.py`.
+
 ## 2026-05-21
 
 ### Album Artist Tag & Filename Fixer
