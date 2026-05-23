@@ -4,14 +4,15 @@ NextMusic Tool - A class-based wrapper for NextMusic API with AES-GCM encryption
 import base64
 import json
 import os
-import random
 import time
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from curl_cffi import requests
 
-from logging_config import setup_logger
-from utils import random_sleep
+from util_commons import random_sleep
+from util_database import MusicDB
+from util_logging import setup_logger
+from model.basic import MusicInfo, MusicURL
 
 # Create logger
 logger = setup_logger(__name__)
@@ -36,6 +37,15 @@ HEADERS = {
 
 class NextMusicToolV2:
     """NextMusic API tool for getting song URLs with AES-GCM encryption"""
+
+    def __init__(self, db_path: str = None):
+        """Initialize NextMusicToolV2 with database connection
+        
+        Args:
+            db_path: Path to SQLite database file. Defaults to 'cloud-music.db'
+        """
+        self.db = MusicDB(db_path)
+        logger.info("NextMusicToolV2 initialized with database caching")
 
     @staticmethod
     def encrypt_payload(payload: dict, base64_key: str) -> str:
@@ -91,8 +101,22 @@ class NextMusicToolV2:
             'aes_key': aes_key
         }
 
-    def get_song_info(self, song_id: str, max_retries: int = MAX_RETRY):
-        """Get song info from NextMusic API with retry mechanism"""
+    def get_song_info(self, song_id: str, max_retries: int = MAX_RETRY) -> MusicInfo:
+        """Get song info from NextMusic API with retry mechanism and database caching
+        
+        Returns:
+            MusicInfo object containing music_id, artist, title, album
+        """
+        # Check database first
+        try:
+            song_id_int = int(song_id)
+            cached_info = self.db.get_music_info(song_id_int)
+            if cached_info:
+                logger.info(f"Cache hit for song info (SongID: {song_id})")
+                return MusicInfo.from_db_row(cached_info)
+        except Exception as e:
+            logger.warning(f"Failed to query cache: {str(e)}")
+        
         last_error = None
         
         for attempt in range(1, max_retries + 1):
@@ -120,13 +144,50 @@ class NextMusicToolV2:
                 if 'ciphertext' in response_json:
                     logger.info("\nServer returned ciphertext, decrypting...")
                     decrypted_data = self.decrypt_response(response_json['ciphertext'], key_data['aes_key'])
-                    logger.info("\n==== Decryption Result ====")
+                    logger.info("\n==== Decryption Result [get_song_info] ====")
                     logger.info(json.dumps(decrypted_data, indent=4, ensure_ascii=False))
-                    return decrypted_data
+                    # Extract model fields only, discard other values
+                    data = decrypted_data.get('data', {})
+                    result = MusicInfo(
+                        music_id=int(data.get('id', song_id)),
+                        artist=data.get('singer'),
+                        title=data.get('name'),
+                        album=data.get('album'),
+                        cover_url=data.get('picimg'),  # API returns picimg field as cover URL
+                        lyrics=None,  # Lyrics not included in song info
+                        duration=data.get('duration')
+                    )
                 else:
                     logger.info("\n==== Parsing Result (Unencrypted) ====")
                     logger.info(json.dumps(response_json, indent=4, ensure_ascii=False))
-                    return response_json
+                    # Extract model fields only, discard other values
+                    data = response_json.get('data', {})
+                    result = MusicInfo(
+                        music_id=int(data.get('id', song_id)),
+                        artist=data.get('singer'),
+                        title=data.get('name'),
+                        album=data.get('album'),
+                        cover_url=data.get('picimg'),  # API returns picimg field as cover URL
+                        lyrics=None,  # Lyrics not included in song info
+                        duration=data.get('duration')
+                    )
+                
+                # Save to database before returning
+                try:
+                    self.db.upsert_music_info(
+                        music_id=result.music_id,
+                        artists=result.artist,
+                        title=result.title,
+                        album_name=result.album,
+                        cover_url=result.cover_url,
+                        lyrics=result.lyrics,
+                        duration=result.duration
+                    )
+                    logger.info(f"Saved song info to database (SongID: {result.music_id})")
+                except Exception as e:
+                    logger.error(f"Failed to save to database: {str(e)}")
+                
+                return result
                 
             except Exception as e:
                 last_error = e
@@ -140,8 +201,22 @@ class NextMusicToolV2:
         logger.error(f"All retries failed, last error: {str(last_error)}")
         return None
 
-    def get_song_lyric(self, song_id: str, max_retries: int = MAX_RETRY):
-        """Get song lyric from NextMusic API with retry mechanism"""
+    def get_song_lyric(self, song_id: str, max_retries: int = MAX_RETRY) -> str:
+        """Get song lyric from NextMusic API with retry mechanism and database caching
+        
+        Returns:
+            Lyric string, or None if not found
+        """
+        # Check database first
+        try:
+            song_id_int = int(song_id)
+            cached_info = self.db.get_music_info(song_id_int)
+            if cached_info and cached_info.get('lyrics'):
+                logger.info(f"Cache hit for song lyric (SongID: {song_id})")
+                return cached_info['lyrics']
+        except Exception as e:
+            logger.warning(f"Failed to query cache: {str(e)}")
+        
         last_error = None
         
         for attempt in range(1, max_retries + 1):
@@ -174,28 +249,57 @@ class NextMusicToolV2:
                 if 'ciphertext' in response_json:
                     logger.info("\nServer returned ciphertext, decrypting...")
                     decrypted_data = self.decrypt_response(response_json['ciphertext'], key_data['aes_key'])
-                    logger.info("\n==== Decryption Result ====")
+                    logger.info("\n==== Decryption Result [get_song_lyric] ====")
                     logger.info(json.dumps(decrypted_data, indent=4, ensure_ascii=False))
-                    return decrypted_data
+                    # Extract lyric only, discard other values
+                    data = decrypted_data.get('data', {})
+                    lyric = data.get('lrc')
                 else:
                     logger.info("\n==== Parsing Result (Unencrypted) ====")
                     logger.info(json.dumps(response_json, indent=4, ensure_ascii=False))
-                    return response_json
+                    # Extract lyric only, discard other values
+                    data = response_json.get('data', {})
+                    lyric = data.get('lrc')
+                
+                # Save lyric to database before returning
+                if lyric:
+                    try:
+                        song_id_int = int(song_id)
+                        self.db.upsert_music_info(music_id=song_id_int, lyrics=lyric)
+                        logger.info(f"Saved song lyric to database (SongID: {song_id_int})")
+                    except Exception as e:
+                        logger.error(f"Failed to save lyric to database: {str(e)}")
+                
+                return lyric
                 
             except Exception as e:
                 last_error = e
                 logger.error(f"Attempt {attempt}/{max_retries} failed: {str(e)}")
-                if attempt < max_retries:
-                    logger.info(f"Waiting before retry...")
-                    random_sleep(min_delay=10.0, max_delay=20.0, reason="Next Music Tool get_song_lyric retrying...")
-                else:
-                    logger.error(f"Maximum retry count reached ({max_retries})")
+                # if attempt < max_retries:
+                #     logger.info(f"Waiting before retry...")
+                #     random_sleep(min_delay=10.0, max_delay=20.0, reason="Next Music Tool get_song_lyric retrying...")
+                # else:
+                #     logger.error(f"Maximum retry count reached ({max_retries})")
         
         logger.error(f"All retries failed, last error: {str(last_error)}")
         return None
 
-    def get_song_url(self, song_id: str, level: str = "lossless", max_retries: int = MAX_RETRY):
-        """Get song URL from NextMusic API with retry mechanism"""
+    def get_song_url(self, song_id: str, level: str = "lossless", max_retries: int = MAX_RETRY) -> MusicURL:
+        """Get song URL from NextMusic API with retry mechanism and database caching
+        
+        Returns:
+            MusicURL object containing music_id, quality, and url
+        """
+        # Check database first
+        try:
+            song_id_int = int(song_id)
+            cached_url = self.db.get_music_url(song_id_int, level)
+            if cached_url:
+                logger.info(f"Cache hit for song URL (SongID: {song_id}, Quality: {level})")
+                return MusicURL(music_id=song_id_int, quality=level, url=cached_url)
+        except Exception as e:
+            logger.warning(f"Failed to query cache: {str(e)}")
+        
         last_error = None
         
         for attempt in range(1, max_retries + 1):
@@ -229,26 +333,64 @@ class NextMusicToolV2:
                 if 'ciphertext' in response_json:
                     logger.info("\nServer returned ciphertext, decrypting...")
                     decrypted_data = self.decrypt_response(response_json['ciphertext'], key_data['aes_key'])
-                    logger.info("\n==== Decryption Result ====")
+                    logger.info("\n==== Decryption Result [get_song_url] ====")
                     logger.info(json.dumps(decrypted_data, indent=4, ensure_ascii=False))
                     if 'data' in decrypted_data and 'url' in decrypted_data['data']:
                         logger.info(f"\nSong direct URL obtained successfully: {decrypted_data['data']['url']}")
-                        return decrypted_data
+                        # Extract model fields only, discard other values (size, etc.)
+                        data = decrypted_data['data']
+                        result = MusicURL(
+                            music_id=int(data.get('id', song_id)),
+                            quality=data.get('level', level),
+                            url=data.get('url')
+                        )
+                        
+                        # Save to database before returning
+                        try:
+                            self.db.upsert_music_url(
+                                music_id=result.music_id,
+                                quality=result.quality,
+                                url=result.url
+                            )
+                            logger.info(f"Saved song URL to database (SongID: {result.music_id}, Quality: {result.quality})")
+                        except Exception as e:
+                            logger.error(f"Failed to save URL to database: {str(e)}")
+                        
+                        return result
                 else:
-                    logger.info("\n==== Parsing Result (Unencrypted) ====")
+                    logger.info("\n==== Parsing Result (Unencrypted) [get_song_url] ====")
                     logger.info(json.dumps(response_json, indent=4, ensure_ascii=False))
-                    return response_json
+                    # Extract model fields only, discard other values
+                    data = response_json.get('data', {})
+                    result = MusicURL(
+                        music_id=int(data.get('id', song_id)),
+                        quality=data.get('level', level),
+                        url=data.get('url')
+                    )
+                    
+                    # Save to database before returning
+                    try:
+                        self.db.upsert_music_url(
+                            music_id=result.music_id,
+                            quality=result.quality,
+                            url=result.url
+                        )
+                        logger.info(f"Saved song URL to database (SongID: {result.music_id}, Quality: {result.quality})")
+                    except Exception as e:
+                        logger.error(f"Failed to save URL to database: {str(e)}")
+                    
+                    return result
 
                 return None
                 
             except Exception as e:
                 last_error = e
                 logger.error(f"Attempt {attempt}/{max_retries} failed: {str(e)}")
-                if attempt < max_retries:
-                    logger.info(f"Waiting before retry...")
-                    random_sleep(min_delay=10.0, max_delay=20.0, reason="Next Music Tool get_song_url retrying...")
-                else:
-                    logger.error(f"Maximum retry count reached ({max_retries})")
+                # if attempt < max_retries:
+                #     logger.info(f"Waiting before retry...")
+                #     random_sleep(min_delay=10.0, max_delay=20.0, reason="Next Music Tool get_song_url retrying...")
+                # else:
+                #     logger.error(f"Maximum retry count reached ({max_retries})")
         
         logger.error(f"All retries failed, last error: {str(last_error)}")
         return None
@@ -264,5 +406,7 @@ if __name__ == "__main__":
     result_2 = tool.get_song_lyric(song_id)  # Test the new lyric method
     result_3 = tool.get_song_url(song_id, level="standard")
 
-    print(result_1, result_2, result_3)
+    logger.info(f"Song info: {result_1}")
+    logger.info(f"Song lyric: {result_2}")
+    logger.info(f"Song URL: {result_3}")
 

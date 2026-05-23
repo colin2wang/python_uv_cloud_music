@@ -19,6 +19,24 @@ This document records all significant changes to the Music Library Organizer pro
 
 ---
 
+## 2026-05-23
+
+### Music Library Models & Database Management Utilities
+
+Added comprehensive music library models and database management utilities. Created `model` package with basic and extra models including `Config`, `MusicInfo`, `MusicURL`, `AlbumMetadata`, `SongMetadata`, and `PlaylistMetadata` classes. Added DDL scripts for `config`, `music_info`, and `music_url` tables in ddl/ directory. Implemented `MusicDB` class for database operations including upsert, query, and config management. Enhanced database interaction across multiple modules with proper connection handling. Updated `util_database.py` with comprehensive database management functions. Modified files: `model/`, `ddl/`, `util_database.py`, `util_commons.py`, `util_config.py`, `interactive_process.py`, `process_cloud_music.py`, `tool_next_music_v1.py`, `tool_next_music_v2.py`, and several process scripts.
+
+---
+
+### Download Interval Control Enhancement
+
+Enhanced download interval control mechanism with database-based timestamp storage. Updated `ensure_download_interval()` and `update_last_download_timestamp()` functions to use database instead of file-based storage for last download timestamps. Implemented proper database connection handling with `MusicDB` instance in `util_commons.py`. Added `get_download_interval()` method in `util_config.py` with default 30-second interval. Improved error handling for timestamp parsing and database operations. Ensures more reliable interval enforcement between downloads to prevent API rate limiting. Modified files: `util_commons.py`, `util_config.py`, `process_cloud_music.py`.
+
+---
+
+### API Call Optimization
+
+Optimized API call execution by moving `api.parse_song()` call from general execution flow to the else block of `config.should_use_next_music_tool()` condition. This prevents unnecessary API calls when Next Music Tool is enabled, improving efficiency and reducing API usage. When Next Music Tool is configured, the application now bypasses the original API call entirely, relying solely on Next Music Tool data. When Next Music Tool is disabled, the original API call executes as before. Modified file: `process_cloud_music.py`.
+
 ## 2026-05-21
 
 ### Album Artist Tag & Filename Fixer

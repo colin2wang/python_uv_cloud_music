@@ -7,7 +7,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 # Note here: replaced the original requests library
 from curl_cffi import requests
 
-from logging_config import setup_logger
+from util_logging import setup_logger
 
 logger = setup_logger(__name__)
 

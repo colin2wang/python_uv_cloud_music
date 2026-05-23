@@ -10,3 +10,6 @@ logs/
 
 # Last metainfo files
 last_*.txt
+
+# Database files
+*.db

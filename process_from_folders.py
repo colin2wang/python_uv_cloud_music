@@ -24,7 +24,7 @@ Usage:
 from pathlib import Path
 from typing import List
 
-from logging_config import setup_logger
+from util_logging import setup_logger
 from process_album_artist_fix import fix_album_artists
 
 # Create logger
