@@ -36,7 +36,11 @@ class MusicDB:
         """
         self.db_path = Path(db_path) if db_path else Path.cwd() / 'cloud-music.db'
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        # self._initialize_tables()
+        
+        # Initialize tables only if database file doesn't exist
+        if not self.db_path.exists():
+            self._initialize_tables()
+        
         # In-memory URL cache: {(music_id, quality): url}
         self._url_cache = {}
         self._url_cache_lock = threading.Lock()
