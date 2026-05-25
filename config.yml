@@ -53,7 +53,7 @@ metadata:
   max_lyric_length: 1000
 
   # Whether to use NextMusicTool to replace song URL (default: false)
-  use_next_music_tool: true
+  use_next_music_tool: false
 
 # Network Configuration
 network:
@@ -66,8 +66,8 @@ network:
   # Minimum delay between API calls in seconds
   api_delay_min: 1.0
 
-  # Number of retries for failed requests (default: 3)
-  max_retries: 3
+  # Number of retries for failed requests (default: 1)
+  max_retries: 1
 
   # Minimum interval between downloads in seconds (default: 30)
   download_interval: 30
@@ -85,6 +85,3 @@ logging:
 
   # Whether to output to file
   file_output: true
-
-  # Log file path
-  log_file: "logs/app.log"

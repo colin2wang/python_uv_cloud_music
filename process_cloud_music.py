@@ -336,6 +336,10 @@ def get_song_metadata_by_song_id(song_id: str, level: str = "lossless") -> dict:
             if result_json.get('status') == 200 and result_json.get('data', {}).get('url'):
                 actual_level = result_json.get('data', {}).get('level', '')
                 if actual_level and actual_level != try_quality_level:
+                    if retry_count == max_retries:
+                        # Take the last result as the final one, if still not match the expected quality
+                        result = result_json
+                        logger.info(f"Last result: Quality mismatch: expected: [{try_quality_level}], actual: [{actual_level}]")
                     logger.warning(
                         f"Quality mismatch: expected: [{try_quality_level}], actual: [{actual_level}]. Retrying...")
                     continue
@@ -964,7 +968,7 @@ def download_playlist(playlist_id: str, index_ids: List[int], level: Optional[st
 
 
 if __name__ == "__main__":
-    download_song("2618710190")
+    download_song("2024234291")
 
     indexes = []
     # indexes = [4, 6, 15, 18, 19]
