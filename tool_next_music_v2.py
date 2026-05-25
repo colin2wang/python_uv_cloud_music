@@ -401,12 +401,13 @@ if __name__ == "__main__":
     tool = NextMusicToolV2()
 
     # Get song URL (use standard quality as default safe test)
-    song_id = 26427662
+    song_id = "1832966854"
     result_1 = tool.get_song_info(song_id)
-    result_2 = tool.get_song_lyric(song_id)  # Test the new lyric method
-    result_3 = tool.get_song_url(song_id, level="standard")
-
     logger.info(f"Song info: {result_1}")
+
+    result_2 = tool.get_song_lyric(song_id)  # Test the new lyric method
     logger.info(f"Song lyric: {result_2}")
+
+    result_3 = tool.get_song_url(song_id, level="standard")
     logger.info(f"Song URL: {result_3}")
 

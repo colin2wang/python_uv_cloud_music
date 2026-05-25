@@ -13,3 +13,6 @@ last_*.txt
 
 # Database files
 *.db
+
+# AI plugin cache
+.proxyai/
