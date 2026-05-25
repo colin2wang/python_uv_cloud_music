@@ -19,6 +19,22 @@ This document records all significant changes to the Music Library Organizer pro
 
 ---
 
+## 2026-05-25
+
+### Code Quality Improvements
+
+Updated song ID format in test script and reorganized logging output. Changed default song ID from numeric `26427662` to string `"1832966854"` for consistency. Reordered logging statements in main block for better readability. Updated `.gitignore` to exclude AI plugin cache directory (`.proxyai/`). Modified files: `tool_next_music_v2.py`, `.gitignore`.
+
+---
+
+## 2026-05-24
+
+### Database Initialization Optimization
+
+Optimized database initialization logic to avoid unnecessary table recreation on every run. Implemented conditional check in `MusicDB.__init__()` to only create tables when the database file doesn't exist. Prevents potential data loss and improves startup performance by skipping redundant DDL operations. Modified files: `util_database.py`.
+
+---
+
 ## 2026-05-23
 
 ### Music Library Models & Database Management Utilities
