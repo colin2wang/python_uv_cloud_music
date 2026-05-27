@@ -6,9 +6,9 @@ from mutagen.flac import FLAC
 from mutagen.id3 import ID3, TPE1
 from mutagen.mp4 import MP4
 
+from util_commons import AUDIO_EXTENSIONS, clean_filename
 from util_config import config
 from util_logging import setup_logger
-from util_commons import AUDIO_EXTENSIONS, clean_filename
 
 # Create logger
 logger = setup_logger(__name__)

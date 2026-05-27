@@ -69,8 +69,8 @@ network:
   # Number of retries for failed requests (default: 1)
   max_retries: 1
 
-  # Minimum interval between downloads in seconds (default: 30)
-  download_interval: 30
+  # Minimum interval between get_metadata requests in seconds (default: 30)
+  get_metadata_interval: 30
 
 # Logging Configuration
 logging:

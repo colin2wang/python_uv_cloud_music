@@ -7,8 +7,8 @@ import imagesize
 import requests
 
 from util_logging import setup_logger
-from process_cloud_music import get_song_ids_by_album_id
 from util_commons import random_sleep
+from util_music_metadata import get_song_ids_by_album_id
 
 # Create logger
 logger = setup_logger(__name__)

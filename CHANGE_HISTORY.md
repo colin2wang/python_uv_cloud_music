@@ -19,6 +19,14 @@ This document records all significant changes to the Music Library Organizer pro
 
 ---
 
+## 2026-05-27
+
+### Method Renaming for Metadata Interval Control
+
+Renamed download interval related methods to better reflect their actual usage for metadata fetching. Changed `download_interval` configuration to `get_metadata_interval` in `config.yml`. Renamed `ensure_download_interval()` → `ensure_get_metadata_interval()`, `finish_download()` → `finish_get_metadata()`, and `get_download_interval()` → `get_get_metadata_interval()`. Updated database timestamp key from `last_download_timestamp` to `last_get_metadata_timestamp`. Modified files: `config.yml`, `util_config.py`, `util_commons.py`, `util_music_downloader.py`, `util_music_metadata.py`.
+
+---
+
 ## 2026-05-25
 
 ### Code Quality Improvements

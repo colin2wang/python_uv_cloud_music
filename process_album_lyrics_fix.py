@@ -1,6 +1,5 @@
 import os
 import re
-import time
 from pathlib import Path
 from typing import Optional
 
@@ -8,10 +7,10 @@ from mutagen.flac import FLAC
 from mutagen.id3 import ID3, COMM
 from mutagen.mp4 import MP4
 
+from util_commons import clean_filename, random_sleep
 from util_config import config
 from util_logging import setup_logger
-from process_cloud_music import get_song_ids_by_album_id, get_song_metadata_by_song_id
-from util_commons import clean_filename, random_sleep
+from util_music_metadata import get_song_ids_by_album_id, get_song_metadata_by_song_id
 
 # Create logger
 logger = setup_logger(__name__)

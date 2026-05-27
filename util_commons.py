@@ -10,15 +10,20 @@ from pathlib import Path
 from typing import Optional
 
 from util_config import config
-from util_logging import setup_logger
-from tqdm import tqdm
 from util_database import MusicDB
+from util_logging import setup_logger
+
+CONSTANT_GET_METADATA_TIMESTAMP = 'last_get_metadata_timestamp'
 
 # Create logger for utils module
 logger = setup_logger(__name__)
 
 # Database instance
 db = MusicDB()
+
+# HTTP Code Constants
+HTTP_OK = 200
+HTTP_TOO_MANY_REQUESTS = 429
 
 # Supported audio formats
 AUDIO_EXTENSIONS = {'.mp3', '.mp2', '.mp1', '.flac', '.m4a', '.mp4', '.aac'}
@@ -271,60 +276,93 @@ def random_sleep(max_delay: float = None, min_delay: float = 1.0, reason: str = 
     logger.info(f"Sleep completed.")
 
 
-def ensure_download_interval():
+def ensure_interval(timestamp_key: str, interval: float) -> float:
     """
-    Ensure minimum interval between downloads by checking database timestamp.
-    
-    This function should be called at the beginning of download_song_and_resources.
-    It reads the last download timestamp from database and waits if necessary
-    to maintain the configured download interval.
+    Ensure minimum interval between operations by checking database timestamp.
+
+    Args:
+        timestamp_key: The key name in database config table for storing the timestamp
+        interval: Minimum interval in seconds between operations
+
+    Returns:
+        The wait time in seconds (0 if no wait was needed)
     """
-    import os
-    
-    download_interval = config.get_download_interval()
-    
+
     # Get current timestamp
     current_time = time.time()
-    
-    # Check if last download timestamp exists in database
-    last_timestamp_str = db.get_config('last_download_timestamp')
-    
+
+    # Check if last timestamp exists in database
+    last_timestamp_str = db.get_config(timestamp_key)
+
     if last_timestamp_str:
         try:
             last_timestamp = float(last_timestamp_str)
-            
-            # Calculate elapsed time since last download
+
+            # Calculate elapsed time since last operation
             elapsed_time = current_time - last_timestamp
-            
+
             # If less than required interval, wait for the remaining time
-            if elapsed_time < download_interval:
-                wait_time = download_interval - elapsed_time
-                logger.info(f"Last download was {elapsed_time:.2f}s ago. Waiting {wait_time:.2f}s to maintain {download_interval}s interval...")
-                random_sleep(max_delay=wait_time, min_delay=wait_time, reason="Maintaining download interval")
+            if elapsed_time < interval:
+                wait_time = interval - elapsed_time
+                logger.info(
+                    f"Last operation was {elapsed_time:.2f}s ago. Waiting {wait_time:.2f}s to maintain {interval}s interval...")
+                random_sleep(max_delay=wait_time, min_delay=wait_time, reason="Maintaining interval")
+                return wait_time
             else:
-                logger.info(f"Sufficient time has passed since last download ({elapsed_time:.2f}s >= {download_interval}s). No wait needed.")
+                logger.info(
+                    f"Sufficient time has passed since last operation ({elapsed_time:.2f}s >= {interval}s). No wait needed.")
+                return 0.0
         except (ValueError, TypeError) as e:
-            logger.warning(f"Error parsing last download timestamp: {e}. Waiting full interval.")
+            logger.warning(f"Error parsing timestamp '{timestamp_key}': {e}. Waiting full interval.")
             # If timestamp is corrupted, wait full interval
-            _wait_full_interval(download_interval)
+            _wait_full_interval(interval)
+            return interval
     else:
-        logger.info(f"No previous download record found. Waiting full interval ({download_interval}s)...")
-        _wait_full_interval(download_interval)
+        logger.info(f"No previous record found for '{timestamp_key}'. Waiting full interval ({interval}s)...")
+        _wait_full_interval(interval)
+        return interval
 
 
-def update_last_download_timestamp():
+def update_timestamp(timestamp_key: str) -> bool:
     """
-    Update the last download timestamp in database.
-    
-    This function should be called at the end of download_song_and_resources
-    to record when the current download completed.
+    Update the timestamp in database for a given key.
+
+    Args:
+        timestamp_key: The key name in database config table for storing the timestamp
+
+    Returns:
+        True if the update was successful, False otherwise
     """
     try:
         current_timestamp = str(time.time())
-        db.upsert_config('last_download_timestamp', current_timestamp)
-        logger.debug("Updated last download timestamp in database.")
+        db.upsert_config(timestamp_key, current_timestamp)
+        logger.debug(f"Updated timestamp '{timestamp_key}' in database.")
+        return True
     except Exception as e:
-        logger.error(f"Failed to write last download timestamp to database: {e}")
+        logger.error(f"Failed to write timestamp '{timestamp_key}' to database: {e}")
+        return False
+
+
+def ensure_get_metadata_interval():
+    """
+    Ensure minimum interval between get_metadata requests by checking database timestamp.
+
+    This function should be called before making get_metadata requests.
+    It reads the last get_metadata timestamp from database and waits if necessary
+    to maintain the configured interval.
+    """
+    get_metadata_interval = config.get_get_metadata_interval()
+    ensure_interval(CONSTANT_GET_METADATA_TIMESTAMP, get_metadata_interval)
+
+
+def finish_get_metadata():
+    """
+    Update the last get_metadata timestamp in database.
+
+    This function should be called after completing a get_metadata request
+    to record when the current request completed.
+    """
+    update_timestamp(CONSTANT_GET_METADATA_TIMESTAMP)
 
 
 def _wait_full_interval(interval: float):

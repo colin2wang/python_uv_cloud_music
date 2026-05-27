@@ -5,10 +5,10 @@ Provides database operations for music_info table and in-memory URL caching.
 Supports query by id/quality and upsert operations.
 """
 import sqlite3
-from pathlib import Path
-from typing import Optional, Dict, List
-from contextlib import contextmanager
 import threading
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Optional, Dict
 
 from util_logging import setup_logger
 

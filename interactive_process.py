@@ -3,13 +3,12 @@ Interactive download script for cloud music.
 Provides a user-friendly interface to select download method and input parameters.
 """
 
-import sys
 import json
-from pathlib import Path
+import sys
 
-from util_logging import setup_logger
-from process_cloud_music import download_song, download_album, download_playlist
 from util_database import MusicDB
+from util_music_downloader import download_song, download_album, download_playlist
+from util_logging import setup_logger
 
 # Create logger
 logger = setup_logger(__name__)

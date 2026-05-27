@@ -125,7 +125,7 @@ class ConfigManager:
                 'random_delay_max': 2.5,
                 'api_delay_min': 1.0,
                 'max_retries': 3,
-                'download_interval': 30
+                'get_metadata_interval': 30
             },
             'logging': {
                 'level': 'INFO',
@@ -250,9 +250,9 @@ class ConfigManager:
         """Get maximum number of retries for failed requests"""
         return self.get('network.max_retries', 3)
     
-    def get_download_interval(self) -> float:
-        """Get minimum interval between downloads in seconds"""
-        return self.get('network.download_interval', 30)
+    def get_get_metadata_interval(self) -> float:
+        """Get minimum interval between get_metadata requests in seconds"""
+        return self.get('network.get_metadata_interval', 30)
     
     def reload(self) -> dict:
         """
