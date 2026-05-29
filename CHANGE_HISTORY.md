@@ -19,6 +19,14 @@ This document records all significant changes to the Music Library Organizer pro
 
 ---
 
+## 2026-05-29
+
+### Filename Generation & Index Parsing Enhancements
+
+Refactored interactive download script with improved filename generation and index parsing capabilities. Enhanced `_build_filename()` function to intelligently handle artist name truncation when filenames exceed Windows path length limit (200 chars). Added support for multiple artists in filename construction, preserving all artists when possible and progressively truncating the artist list as fallback. Implemented modular function structure separating single song, album, and playlist download flows for better maintainability. Enhanced `parse_indexes()` to support hyphen ranges (e.g., "3-6") and Chinese commas (，) alongside standard formats. Modified files: `interactive_process.py`, `util_music_downloader.py`.
+
+---
+
 ## 2026-05-27
 
 ### Import Structure Refactoring in Interactive Download Script
