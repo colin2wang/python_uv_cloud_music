@@ -21,6 +21,12 @@ This document records all significant changes to the Music Library Organizer pro
 
 ## 2026-05-27
 
+### Import Structure Refactoring in Interactive Download Script
+
+Reorganized import statements in `interactive_process.py` to use modular utility modules. Moved download functions (`download_song`, `download_album`, `download_playlist`) from `process_cloud_music.py` to newly created `util_music_downloader.py`. Removed unused imports including duplicate `sys` and `pathlib.Path`. Improved code organization and separation of concerns by isolating download functionality into dedicated utility module. Modified files: `interactive_process.py`.
+
+---
+
 ### Method Renaming for Metadata Interval Control
 
 Renamed download interval related methods to better reflect their actual usage for metadata fetching. Changed `download_interval` configuration to `get_metadata_interval` in `config.yml`. Renamed `ensure_download_interval()` → `ensure_get_metadata_interval()`, `finish_download()` → `finish_get_metadata()`, and `get_download_interval()` → `get_get_metadata_interval()`. Updated database timestamp key from `last_download_timestamp` to `last_get_metadata_timestamp`. Modified files: `config.yml`, `util_config.py`, `util_commons.py`, `util_music_downloader.py`, `util_music_metadata.py`.
