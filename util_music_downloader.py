@@ -317,39 +317,53 @@ def _extract_file_extension(download_url: str) -> str:
 def _build_filename(song_name: str, artist: str, idx: Optional[int] = None) -> str:
     """Build safe filename"""
     safe_song_name = clean_filename(song_name)
-    safe_artist = clean_filename(artist)
     
-    if not safe_song_name and not safe_artist:
+    if not safe_song_name:
         return "Unknown_Song"
         
     add_index = config.should_add_index()
     index_format = config.get_index_format()
 
-    if idx is not None and add_index:
-        formatted_index = f"{idx:{index_format}}"
-        filename = f"{formatted_index} - {safe_artist} - {safe_song_name}"
-    else:
-        filename = f"{safe_artist} - {safe_song_name}"
-
-    # Check and truncate overly long filenames
+    # Check if filename will be too long, and truncate artist name if needed
     MAX_FILENAME_LENGTH = 200
-    if len(filename) > MAX_FILENAME_LENGTH:
-        logger.warning(f"Filename too long ({len(filename)} chars), truncating")
+    
+    def build_with_artist(artists: list) -> str:
+        """Build filename with given artist list"""
+        safe_artists = [clean_filename(a.strip()) for a in artists if a.strip()]
+        artist_str = ', '.join(safe_artists)
+        
         if idx is not None and add_index:
             formatted_index = f"{idx:{index_format}}"
-            available_length = MAX_FILENAME_LENGTH - len(formatted_index) - 4
-            total_len = len(safe_artist) + len(safe_song_name)
-            if total_len > 0:
-                # Allocate length proportionally
-                artist_ratio = len(safe_artist) / total_len
-                song_ratio = len(safe_song_name) / total_len
-                max_artist_len = int(available_length * artist_ratio)
-                max_song_len = int(available_length * song_ratio)
-                safe_artist = safe_artist[:max_artist_len]
-                safe_song_name = safe_song_name[:max_song_len]
-            filename = f"{formatted_index} - {safe_artist} - {safe_song_name}"
+            return f"{formatted_index} - {artist_str} - {safe_song_name}"
         else:
-            filename = filename[:MAX_FILENAME_LENGTH]
+            return f"{artist_str} - {safe_song_name}"
+
+    # Parse original artist list
+    artist_parts = [a.strip() for a in artist.split(',') if a.strip()]
+    
+    # Try with all artists first
+    filename = build_with_artist(artist_parts)
+    
+    # If too long, truncate artist names by keeping fewer artists
+    if len(filename) > MAX_FILENAME_LENGTH:
+        logger.warning(f"Filename too long ({len(filename)} chars), truncating artist list")
+        
+        # Keep only first N artists until filename fits
+        for i in range(len(artist_parts)):
+            truncated_filename = build_with_artist(artist_parts[:i+1])
+            if len(truncated_filename) <= MAX_FILENAME_LENGTH:
+                filename = truncated_filename
+                break
+        
+        # If still too long, fall back to simple truncation
+        if len(filename) > MAX_FILENAME_LENGTH:
+            formatted_index = f"{idx:{index_format}}" if idx is not None and add_index else ""
+            available_length = MAX_FILENAME_LENGTH - len(formatted_index) - 4 - len(safe_song_name) - 4
+            if artist_parts:
+                safe_artist = clean_filename(artist_parts[0])
+                if len(safe_artist) > available_length:
+                    safe_artist = safe_artist[:available_length]
+                filename = build_with_artist([safe_artist])
 
     return filename
 
