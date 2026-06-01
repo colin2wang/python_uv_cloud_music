@@ -16,3 +16,4 @@ last_*.txt
 
 # AI plugin cache
 .proxyai/
+.atomcode/
