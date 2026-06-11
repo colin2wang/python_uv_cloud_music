@@ -5,6 +5,7 @@ Provides a user-friendly interface to select download method and input parameter
 
 import json
 import sys
+import msvcrt
 
 from util_database import MusicDB
 from util_music_downloader import download_song, download_album, download_playlist
@@ -15,6 +16,57 @@ logger = setup_logger(__name__)
 
 # Database instance
 db = MusicDB()
+
+
+class ReturnToMainMenu(Exception):
+    """Raised when user presses ESC key to return to the main menu."""
+    pass
+
+
+def esc_input(prompt: str = "", default: str = "") -> str:
+    """
+    Read input character by character; press ESC to return to main menu.
+    
+    Args:
+        prompt: Prompt message to display
+        default: Default value if user presses Enter
+        
+    Returns:
+        User input string or default value
+        
+    Raises:
+        ReturnToMainMenu: When ESC key is pressed
+    """
+    if default:
+        print(f"{prompt} [{default}]: ", end='', flush=True)
+    else:
+        print(f"{prompt}: ", end='', flush=True)
+    
+    chars = []
+    while True:
+        ch = msvcrt.getch()
+        if ch == b'\x1b':  # ESC key
+            print()  # Move to next line
+            raise ReturnToMainMenu()
+        elif ch == b'\xe0':  # Arrow / function key prefix, consume and ignore
+            msvcrt.getch()
+        elif ch == b'\r':  # Enter key
+            print()
+            break
+        elif ch == b'\x08':  # Backspace
+            if chars:
+                chars.pop()
+                print('\b \b', end='', flush=True)
+        else:
+            try:
+                char = ch.decode('utf-8')
+                chars.append(char)
+                print(char, end='', flush=True)
+            except UnicodeDecodeError:
+                pass  # Ignore unprintable characters
+    
+    result = ''.join(chars).strip()
+    return result if result else default
 
 
 def load_last_config() -> dict:
@@ -121,6 +173,7 @@ def parse_indexes(input_str: str) -> list:
 def get_user_input(prompt: str, default: str = "") -> str:
     """
     Get user input with optional default value.
+    Press ESC to return to main menu.
     
     Args:
         prompt: Prompt message to display
@@ -129,14 +182,8 @@ def get_user_input(prompt: str, default: str = "") -> str:
     Returns:
         User input string or default value
     """
-    if default:
-        full_prompt = f"{prompt} [{default}]: "
-    else:
-        full_prompt = f"{prompt}: "
-    
     try:
-        user_input = input(full_prompt).strip()
-        return user_input if user_input else default
+        return esc_input(prompt, default)
     except (EOFError, KeyboardInterrupt):
         print("\n\nOperation cancelled by user.")
         sys.exit(0)
@@ -160,7 +207,7 @@ def confirm_indexes(indexes: list) -> bool:
     print(f"Total count: {len(indexes)}")
     
     while True:
-        confirm = input("Are these indexes correct? (yes/no) [yes]: ").strip().lower()
+        confirm = esc_input("Are these indexes correct? (yes/no)", "yes").lower()
         if confirm in ['', 'yes', 'y']:
             return True
         elif confirm in ['no', 'n']:
@@ -190,7 +237,7 @@ def select_download_method(default_method: int = 1) -> int:
     print("-" * 60)
     
     while True:
-        choice = input(f"Enter your choice (0-3) [{default_method}]: ").strip()
+        choice = esc_input("Enter your choice (0-3)", str(default_method))
         if choice == '':
             logger.info(f"User selected download method: {default_method} (default)")
             return default_method
@@ -229,7 +276,7 @@ def should_download_specific_tracks() -> bool:
     Returns:
         True if user wants specific tracks, False otherwise
     """
-    answer = input("\nDo you want to download specific tracks only? (yes/no) [no]: ").strip().lower()
+    answer = esc_input("\nDo you want to download specific tracks only? (yes/no)", "no").lower()
     return answer in ['yes', 'y']
 
 
@@ -370,36 +417,42 @@ def run_download_session():
     Main interactive download loop.
     
     Runs the complete download flow in a loop until user chooses to exit.
+    Press ESC at any prompt to return to the main menu.
     """
     print("\nWelcome to Cloud Music Interactive Download Tool!")
     
     while True:
-        # Load last configuration at the start of each iteration
-        last_config = load_last_config()
+        try:
+            # Load last configuration at the start of each iteration
+            last_config = load_last_config()
+            
+            # Step 1: Select download method
+            method = select_download_method(last_config.get('method', 1))
+            
+            if method == 0:
+                print("\nThank you for using Cloud Music Download Tool. Goodbye!")
+                break
+            
+            # Step 2: Execute download based on selected method
+            success = False
+            if method == 1:
+                success = download_single_song(last_config)
+            elif method == 2:
+                success = download_album_or_playlist(2, last_config)
+            elif method == 3:
+                success = download_album_or_playlist(3, last_config)
+            
+            # Ask if user wants to continue (only if previous download succeeded or user wants to retry)
+            print("\n" + "=" * 60)
+            again = esc_input("Do you want to download more? (yes/no)", "yes").lower()
+            logger.info(f"User chose to continue: {again if again else 'yes (default)'}")
+            if again in ['no', 'n']:
+                print("\nThank you for using Cloud Music Download Tool. Goodbye!")
+                break
         
-        # Step 1: Select download method
-        method = select_download_method(last_config.get('method', 1))
-        
-        if method == 0:
-            print("\nThank you for using Cloud Music Download Tool. Goodbye!")
-            break
-        
-        # Step 2: Execute download based on selected method
-        success = False
-        if method == 1:
-            success = download_single_song(last_config)
-        elif method == 2:
-            success = download_album_or_playlist(2, last_config)
-        elif method == 3:
-            success = download_album_or_playlist(3, last_config)
-        
-        # Ask if user wants to continue (only if previous download succeeded or user wants to retry)
-        print("\n" + "=" * 60)
-        again = input("Do you want to download more? (yes/no) [yes]: ").strip().lower()
-        logger.info(f"User chose to continue: {again if again else 'yes (default)'}")
-        if again in ['no', 'n']:
-            print("\nThank you for using Cloud Music Download Tool. Goodbye!")
-            break
+        except ReturnToMainMenu:
+            print("\n↩ Returning to main menu...\n")
+            continue  # Restart the main loop
 
 
 def main():

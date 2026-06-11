@@ -70,7 +70,7 @@ network:
   max_retries: 1
 
   # Minimum interval between get_metadata requests in seconds (default: 30)
-  get_metadata_interval: 30
+  get_metadata_interval: 20
 
 # Logging Configuration
 logging:
