@@ -64,7 +64,7 @@ Your preferences are automatically saved for next time!
 ### Download a Single Song
 
 ```python
-from process_cloud_music import download_song
+from src.process.process_cloud_music import download_song
 
 # Download a song by ID
 download_song("12345678", level="lossless")
@@ -73,7 +73,7 @@ download_song("12345678", level="lossless")
 ### Download an Album
 
 ```python
-from process_cloud_music import download_album
+from src.process.process_cloud_music import download_album
 
 # Download complete album
 download_album("87654321", index_ids=[], level="lossless")
@@ -85,7 +85,7 @@ download_album("87654321", index_ids=[4, 6, 15], level="lossless")
 ### Download a Playlist
 
 ```python
-from process_cloud_music import download_playlist
+from src.process.process_cloud_music import download_playlist
 
 # Download complete playlist
 download_playlist("11223344", index_ids=[], level="lossless")
