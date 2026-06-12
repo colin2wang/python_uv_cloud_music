@@ -19,6 +19,24 @@ This document records all significant changes to the Music Library Organizer pro
 
 ---
 
+## 2026-06-12
+
+### Project Structure Refactoring — Source Layout & Package Organization
+
+Reorganized the entire project into a standard `src/` source layout with well-defined packages. All core logic modules are now organized under `src/util/`, `src/tool/`, `src/process/`, and `src/model/` packages, each with proper `__init__.py` markers.
+
+Key changes:
+- Created `src/` as the root package with sub-packages: `util` (8 utility modules), `tool` (2 NextMusic tool variants), `process` (6 processing scripts), and `model` (basic + extra data models, migrated intact)
+- All cross-module imports updated to `from src.<package>.<module> import ...` format
+- `interactive_process.py` kept at project root as the main entry point — **no changes needed for `scripts/cloud-music.cmd`**
+- Updated `pyproject.toml` with `[tool.setuptools.packages.find] where = ["src"]` for proper src layout support
+- Updated `.gitignore` to cover `__pycache__/` and `*.pyc` files globally
+- All file moves performed via `git mv` preserving full commit history
+
+Modified files: `src/` (all modules moved and re-imported), `pyproject.toml`, `.gitignore`, `interactive_process.py`.
+
+---
+
 ## 2026-05-29
 
 ### Filename Generation & Index Parsing Enhancements

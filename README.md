@@ -223,7 +223,7 @@ Download songs from an album with automatic folder organization.
 **Example:**
 ```python
 # Download complete album
-from process_cloud_music import download_album
+from src.process.process_cloud_music import download_album
 
 # Complete album
 download_album("87654321", level="lossless")
@@ -337,9 +337,9 @@ api = MusicToolAPI(base_url="https://your-custom-api.com")
 The tool includes utilities for processing existing music folder structures:
 
 ```python
-from process_from_folders import process_folders, iterate_folders, list_folders
-from process_album_lyrics_fix import fix_album_lyrics
-from process_album_cover_redownload import redownload_album_cover
+from src.process.process_from_folders import process_folders, iterate_folders, list_folders
+from src.process.process_album_lyrics_fix import fix_album_lyrics
+from src.process.process_album_cover_redownload import redownload_album_cover
 
 # List all album folders in a directory
 folders = list_folders("J:\\Music")
@@ -374,7 +374,7 @@ All functions include comprehensive error handling and logging. Failed downloads
 The tool implements intelligent retry logic for API requests:
 
 ```python
-from process_cloud_music import get_song_metadata_by_song_id
+from src.process.process_cloud_music import get_song_metadata_by_song_id
 
 # Automatically retries up to configured max_retries times
 metadata = get_song_metadata_by_song_id("12345678", level="lossless")
@@ -442,18 +442,47 @@ Special characters are automatically replaced with underscores to ensure cross-p
 
 ```
 .
-├── process_cloud_music.py              # Main processing logic and API client
-├── interactive_process.py              # Interactive download interface
-├── process_from_folders.py             # Folder listing and batch processing utilities
-├── process_album_cover_redownload.py   # Album cover re-download utility
-├── process_album_lyrics_fix.py         # Lyrics correction utility
-├── process_album_metadata_fix.py       # Album metadata correction utility
-├── config_manager.py                   # Configuration management
+├── interactive_process.py              # Interactive download interface (entry point)
+├── scripts/
+│   └── cloud-music.cmd                 # Windows launcher script
+├── src/                                # Main package (source root)
+│   ├── __init__.py
+│   ├── process/                        # Processing logic
+│   │   ├── __init__.py
+│   │   ├── process_cloud_music.py      # Core download orchestration
+│   │   ├── process_from_folders.py     # Folder listing and batch processing
+│   │   ├── process_album_artist_fix.py # Album artist tag fixer
+│   │   ├── process_album_cover_redownload.py  # Cover re-download utility
+│   │   ├── process_album_lyrics_fix.py # Lyrics correction utility
+│   │   └── process_album_metadata_fix.py      # Metadata correction utility
+│   ├── util/                           # Utility modules
+│   │   ├── __init__.py
+│   │   ├── util_commons.py             # Common helper functions
+│   │   ├── util_config.py              # Configuration management
+│   │   ├── util_database.py            # SQLite database operations
+│   │   ├── util_file.py                # File operation utilities
+│   │   ├── util_logging.py             # Logging infrastructure
+│   │   ├── util_music_api.py           # Music API client
+│   │   ├── util_music_downloader.py    # Download management
+│   │   └── util_music_metadata.py      # Metadata fetching & processing
+│   ├── tool/                           # Specialized tools
+│   │   ├── __init__.py
+│   │   ├── tool_next_music_v1.py       # NextMusicTool V1 (AES-GCM)
+│   │   └── tool_next_music_v2.py       # NextMusicTool V2 (AES-GCM + curl_cffi)
+│   └── model/                          # Data models
+│       ├── __init__.py
+│       ├── basic/                      # Core database models
+│       │   ├── __init__.py
+│       │   ├── config.py
+│       │   ├── music_info.py
+│       │   └── music_url.py
+│       └── extra/                      # Extended metadata models
+│           ├── __init__.py
+│           ├── album_metadata.py
+│           ├── playlist_metadata.py
+│           └── song_metadata.py
 ├── config.yml                          # YAML configuration file
-├── logging_config.py                   # Logging configuration
-├── utils.py                            # Utility functions
-├── tool_next_music_v2.py               # NextMusicTool V2 with AES-GCM encryption
-├── pyproject.toml                      # Project dependencies
+├── pyproject.toml                      # Project dependencies & build config
 ├── CHANGE_HISTORY.md                   # Change history and version log
 ├── api_docs/                           # API documentation
 │   ├── get_song.md
