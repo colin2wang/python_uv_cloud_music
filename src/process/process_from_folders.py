@@ -24,8 +24,8 @@ Usage:
 from pathlib import Path
 from typing import List
 
-from util_logging import setup_logger
-from process_album_artist_fix import fix_album_artists
+from src.util.util_logging import setup_logger
+from src.process.process_album_artist_fix import fix_album_artists
 
 # Create logger
 logger = setup_logger(__name__)
@@ -104,7 +104,7 @@ def process_folders(directory: str, process_func, show_progress: bool = True,
 
     Example:
         from list_folders import process_folders
-        from process_album_lyrics_fix import fix_album_lyrics
+        from src.process.process_album_lyrics_fix import fix_album_lyrics
 
         results = process_folders(
             "J:\\Music",

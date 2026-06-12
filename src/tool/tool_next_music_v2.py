@@ -9,10 +9,10 @@ import time
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from curl_cffi import requests
 
-from model.basic import MusicInfo, MusicURL
-from util_commons import random_sleep
-from util_database import MusicDB
-from util_logging import setup_logger
+from src.model.basic import MusicInfo, MusicURL
+from src.util.util_commons import random_sleep
+from src.util.util_database import MusicDB
+from src.util.util_logging import setup_logger
 
 # Create logger
 logger = setup_logger(__name__)

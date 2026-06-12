@@ -6,8 +6,8 @@ import re
 import requests
 from typing import Optional, Dict, Any
 
-from util_config import config
-from util_logging import setup_logger
+from src.util.util_config import config
+from src.util.util_logging import setup_logger
 
 logger = setup_logger(__name__)
 
@@ -83,7 +83,7 @@ class MusicToolAPI:
 
     def search(self, keyword: str, limit: int = 10) -> Optional[dict]:
         """Search for songs"""
-        from util_commons import random_sleep
+        from src.util.util_commons import random_sleep
         random_sleep(5.0, reason="Before search API request")
         try:
             response = self.session.post(
@@ -103,7 +103,7 @@ class MusicToolAPI:
             logger.error(f"Invalid song ID or URL: {song_id_or_url}")
             return None
             
-        from util_commons import random_sleep
+        from src.util.util_commons import random_sleep
         random_sleep(3.0, reason="Before song parsing API request")
         try:
             response = self.session.post(
@@ -123,7 +123,7 @@ class MusicToolAPI:
             logger.error(f"Invalid playlist ID or URL: {playlist_id_or_url}")
             return None
             
-        from util_commons import random_sleep
+        from src.util.util_commons import random_sleep
         random_sleep(3.0, reason="Before playlist parsing API request")
         try:
             response = self.session.get(
@@ -144,7 +144,7 @@ class MusicToolAPI:
             logger.error(f"Invalid album ID or URL: {album_id_or_url}")
             return None
             
-        from util_commons import random_sleep
+        from src.util.util_commons import random_sleep
         random_sleep(3.0, reason="Before album parsing API request")
         try:
             response = self.session.get(
@@ -178,7 +178,7 @@ def _parse_json_response(response_str: str, operation: str) -> Optional[dict]:
 def _handle_429_error(response: requests.Response) -> bool:
     """Handle HTTP 429 error (Too Many Requests)"""
     if response.status_code == HTTP_TOO_MANY_REQUESTS:
-        from util_commons import random_sleep
+        from src.util.util_commons import random_sleep
         random_sleep(min_delay=10.0, max_delay=15.0, reason="429 Too Many Requests - API rate limit")
         return True
     return False
@@ -190,7 +190,7 @@ def _handle_429_error_json(response_str: str) -> bool:
     try:
         data = json.loads(response_str)
         if isinstance(data, dict) and '429' in data.get('message', ''):
-            from util_commons import random_sleep
+            from src.util.util_commons import random_sleep
             random_sleep(min_delay=10.0, max_delay=15.0, reason="429 Too Many Requests - API rate limit")
             return True
     except (json.JSONDecodeError, ValueError):

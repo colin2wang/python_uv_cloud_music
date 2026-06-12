@@ -1,8 +1,8 @@
 """
 Main entry point for cloud music download tool
 """
-from util_music_downloader import download_song, download_album, download_playlist
-from util_logging import setup_logger
+from src.util.util_music_downloader import download_song, download_album, download_playlist
+from src.util.util_logging import setup_logger
 
 logger = setup_logger(__name__)
 

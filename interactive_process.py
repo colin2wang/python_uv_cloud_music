@@ -7,9 +7,9 @@ import json
 import sys
 import msvcrt
 
-from util_database import MusicDB
-from util_music_downloader import download_song, download_album, download_playlist
-from util_logging import setup_logger
+from src.util.util_database import MusicDB
+from src.util.util_music_downloader import download_song, download_album, download_playlist
+from src.util.util_logging import setup_logger
 
 # Create logger
 logger = setup_logger(__name__)

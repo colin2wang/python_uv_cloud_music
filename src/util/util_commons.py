@@ -9,9 +9,9 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from util_config import config
-from util_database import MusicDB
-from util_logging import setup_logger
+from src.util.util_config import config
+from src.util.util_database import MusicDB
+from src.util.util_logging import setup_logger
 
 CONSTANT_GET_METADATA_TIMESTAMP = 'last_get_metadata_timestamp'
 

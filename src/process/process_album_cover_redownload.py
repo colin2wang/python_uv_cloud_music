@@ -6,9 +6,9 @@ from typing import Optional
 import imagesize
 import requests
 
-from util_logging import setup_logger
-from util_commons import random_sleep
-from util_music_metadata import get_song_ids_by_album_id
+from src.util.util_logging import setup_logger
+from src.util.util_commons import random_sleep
+from src.util.util_music_metadata import get_song_ids_by_album_id
 
 # Create logger
 logger = setup_logger(__name__)

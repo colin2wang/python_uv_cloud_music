@@ -15,10 +15,10 @@ from mutagen.id3 import ID3, TIT2, TPE1, TALB, APIC, COMM, TYER, TRCK, TXXX
 from mutagen.mp4 import MP4, MP4Cover
 from tqdm import tqdm
 
-from util_commons import get_audio_extension, get_image_mime_type, get_mp4_image_format, clean_filename, random_sleep, \
+from src.util.util_commons import get_audio_extension, get_image_mime_type, get_mp4_image_format, clean_filename, random_sleep, \
     HTTP_OK, HTTP_TOO_MANY_REQUESTS, IMAGE_EXTENSIONS, AUDIO_EXTENSIONS
-from util_config import config
-from util_logging import setup_logger
+from src.util.util_config import config
+from src.util.util_logging import setup_logger
 
 logger = setup_logger(__name__)
 
@@ -534,7 +534,7 @@ def download_song(song_id: str, level: Optional[str] = None) -> bool:
 
     try:
         quality = level if level is not None else config.get_default_quality()
-        from util_music_metadata import get_song_metadata_by_song_id
+        from src.util.util_music_metadata import get_song_metadata_by_song_id
         metadata = get_song_metadata_by_song_id(song_id, quality)
         
         success = download_song_and_resources(metadata, idx=None)
@@ -745,7 +745,7 @@ def _download_songs_from_metadata(metadata: Any,
             continue
 
          # Fetch and download song
-        from util_music_metadata import get_song_metadata_by_song_id
+        from src.util.util_music_metadata import get_song_metadata_by_song_id
         song_metadata = get_song_metadata_by_song_id(song_id, level)
         success = download_song_and_resources(
             song_metadata,
@@ -790,7 +790,7 @@ def download_album(album_id: str, index_ids: List[int] = None, level: Optional[s
          # Ensure index_ids is a list
         index_list = index_ids if isinstance(index_ids, list) else []
 
-        from util_music_metadata import get_song_ids_by_album_id
+        from src.util.util_music_metadata import get_song_ids_by_album_id
         album_metadata = get_song_ids_by_album_id(album_id)
         if album_metadata is None:
             logger.error("Failed to get album metadata")
@@ -822,7 +822,7 @@ def download_playlist(playlist_id: str, index_ids: List[int] = None, level: Opti
          # Ensure index_ids is a list
         index_list = index_ids if isinstance(index_ids, list) else []
 
-        from util_music_metadata import get_song_ids_by_playlist_id
+        from src.util.util_music_metadata import get_song_ids_by_playlist_id
         playlist_metadata = get_song_ids_by_playlist_id(playlist_id)
         if playlist_metadata is None:
             logger.error("Failed to get playlist metadata")

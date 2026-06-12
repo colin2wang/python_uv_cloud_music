@@ -6,8 +6,8 @@ from mutagen.flac import FLAC, Picture
 from mutagen.id3 import ID3, TIT2, TPE1, TALB, APIC, TYER, TRCK
 from mutagen.mp4 import MP4, MP4Cover
 
-from util_logging import setup_logger
-from util_commons import (
+from src.util.util_logging import setup_logger
+from src.util.util_commons import (
     get_audio_extension, get_image_mime_type, get_mp4_image_format,
     parse_music_filename, find_cover_image
 )

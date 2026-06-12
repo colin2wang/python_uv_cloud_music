@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional, Dict
 
-from util_logging import setup_logger
+from src.util.util_logging import setup_logger
 
 logger = setup_logger(__name__)
 

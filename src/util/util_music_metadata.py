@@ -3,12 +3,12 @@ Metadata processing functions for music files
 """
 
 from typing import List, Optional, Tuple, Any
-from model.basic import MusicInfo, MusicURL
-from model.extra import AlbumMetadata, PlaylistMetadata
-from tool_next_music_v2 import NextMusicToolV2
-from util_commons import random_sleep, ensure_get_metadata_interval, finish_get_metadata
-from util_config import config
-from util_logging import setup_logger
+from src.model.basic import MusicInfo, MusicURL
+from src.model.extra import AlbumMetadata, PlaylistMetadata
+from src.tool.tool_next_music_v2 import NextMusicToolV2
+from src.util.util_commons import random_sleep, ensure_get_metadata_interval, finish_get_metadata
+from src.util.util_config import config
+from src.util.util_logging import setup_logger
 
 logger = setup_logger(__name__)
 
@@ -44,7 +44,7 @@ def _extract_song_details(song_list: List[dict]) -> Tuple[List[str], List[dict]]
 
 def get_song_ids_by_playlist_id(playlist_id: str) -> Optional[PlaylistMetadata]:
     """Get song list by playlist ID"""
-    from util_music_api import MusicToolAPI
+    from src.util.util_music_api import MusicToolAPI
     
     logger.info("=" * 60)
     logger.info("Extract Songs from Playlist ID")
@@ -98,7 +98,7 @@ def get_song_ids_by_playlist_id(playlist_id: str) -> Optional[PlaylistMetadata]:
 
 def get_song_ids_by_album_id(album_id: str) -> Optional[AlbumMetadata]:
     """Get song list by album ID"""
-    from util_music_api import MusicToolAPI
+    from src.util.util_music_api import MusicToolAPI
     
     logger.info("=" * 60)
     logger.info("Extract Songs from Album ID")
@@ -206,7 +206,7 @@ def _fetch_metadata_from_original_api(api: Any, song_id: str, quality_level: str
             return None
             
         # Check if retry is needed (429 error)
-        from util_music_api import _handle_429_error_json
+        from src.util.util_music_api import _handle_429_error_json
         if _handle_429_error_json(result_json.get('data', {}).get('msg', '')):
             logger.info(f"Retrying after 429 error for song {song_id}...")
             result_json = api.parse_song(song_id, quality_level)
@@ -247,7 +247,7 @@ def get_song_metadata_by_song_id(song_id: str, level: Optional[str] = None) -> d
             logger.info("Replacing song URL with NextMusicTool...")
             result_json = _fetch_metadata_from_next_music_tool(song_id, try_quality_level)
         else:
-            from util_music_api import MusicToolAPI
+            from src.util.util_music_api import MusicToolAPI
             api = MusicToolAPI(config.get_api_base_url())
             logger.info(f"Fetching song metadata from Original API (quality: {try_quality_level})...")
             result_json = _fetch_metadata_from_original_api(api, song_id, try_quality_level)
