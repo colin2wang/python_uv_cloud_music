@@ -6,6 +6,7 @@ from mutagen.flac import FLAC, Picture
 from mutagen.id3 import ID3, TIT2, TPE1, TALB, APIC, TYER, TRCK
 from mutagen.mp4 import MP4, MP4Cover
 
+from src.process.process_album_info_loader import load_album_info
 from src.util.util_logging import setup_logger
 from src.util.util_commons import (
     get_audio_extension, get_image_mime_type, get_mp4_image_format,
@@ -38,47 +39,15 @@ class AlbumMetadataFixer:
     def load_album_info(self) -> bool:
         """
         Load album information from album_info.txt
-        
+
         Returns:
             bool: Whether album info was loaded successfully
         """
-        album_info_file = self.album_folder / 'album_info.txt'
-        
-        if not album_info_file.exists():
-            logger.warning(f"album_info.txt not found in {self.album_folder}")
-            return False
-        
-        try:
-            with open(album_info_file, 'r', encoding='utf-8') as f:
-                content = f.read()
-            
-            # Parse album info file
-            lines = content.split('\n')
-            for line in lines:
-                line = line.strip()
-                if ':' in line:
-                    key, value = line.split(':', 1)
-                    key = key.strip().lower()
-                    value = value.strip()
-                    
-                    if key == 'album':
-                        self.album_info['album_name'] = value
-                    elif key == 'artist':
-                        self.album_info['album_artist'] = value
-                    elif key == 'album id':
-                        self.album_info['album_id'] = value
-                    elif key == 'publish date':
-                        self.album_info['publish_date'] = value
-                    elif key == 'song count':
-                        self.album_info['song_count'] = value
-            
-            logger.info(f"Album info loaded: {self.album_info.get('album_name', 'Unknown')} - "
-                       f"{self.album_info.get('album_artist', 'Unknown Artist')}")
+        info = load_album_info(self.album_folder)
+        if info:
+            self.album_info = info
             return True
-            
-        except Exception as e:
-            logger.error(f"Failed to load album_info.txt: {str(e)}")
-            return False
+        return False
     
     def find_cover_image(self) -> Optional[Path]:
         """

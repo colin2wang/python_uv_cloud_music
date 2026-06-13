@@ -140,27 +140,22 @@ class MusicDB:
     
     def upsert_batch_urls(self, music_id: int, urls: Dict[str, str]) -> int:
         """
-        Batch upsert multiple URLs for different qualities.
-        
+        Batch upsert multiple URLs for different qualities to in-memory cache.
+
         Args:
             music_id: Unique music identifier
             urls: Dictionary mapping quality to URL
-            
+
         Returns:
             Number of URLs inserted/updated
         """
         count = 0
-        with self._get_connection() as conn:
+        with self._url_cache_lock:
             for quality, url in urls.items():
-                conn.execute("""
-                    INSERT INTO music_url (music_id, quality, url)
-                    VALUES (?, ?, ?)
-                    ON CONFLICT(music_id, quality) DO UPDATE SET
-                        url = excluded.url
-                """, (music_id, quality, url))
+                self._url_cache[(music_id, quality)] = url
                 count += 1
-        
-        logger.info(f"Batch upserted {count} URLs for music_id={music_id}")
+
+        logger.info(f"Batch upserted {count} URLs to cache for music_id={music_id}")
         return count
     
     # ==================== Query Operations ====================
@@ -202,22 +197,20 @@ class MusicDB:
     
     def get_all_music_urls(self, music_id: int) -> Dict[str, str]:
         """
-        Query all URLs for a music ID.
-        
+        Query all URLs for a music ID from in-memory cache.
+
         Args:
             music_id: Unique music identifier
-            
+
         Returns:
             Dictionary mapping quality to URL
         """
-        with self._get_connection() as conn:
-            cursor = conn.execute(
-                "SELECT quality, url FROM music_url WHERE music_id = ?",
-                (music_id,)
-            )
-            rows = cursor.fetchall()
-        
-        return {row['quality']: row['url'] for row in rows}
+        with self._url_cache_lock:
+            return {
+                quality: url
+                for (mid, quality), url in self._url_cache.items()
+                if mid == music_id
+            }
     
     def get_music_with_urls(self, music_id: int) -> Optional[Dict]:
         """
@@ -318,19 +311,25 @@ class MusicDB:
     
     def delete_music(self, music_id: int) -> bool:
         """
-        Delete music info and all associated URLs.
-        
+        Delete music info and all associated cached URLs.
+
         Args:
             music_id: Unique music identifier
-            
+
         Returns:
             True if deleted
         """
         with self._get_connection() as conn:
-            conn.execute("DELETE FROM music_url WHERE music_id = ?", (music_id,))
             cursor = conn.execute("DELETE FROM music_info WHERE music_id = ?", (music_id,))
             deleted = cursor.rowcount > 0
-        
+
+        with self._url_cache_lock:
+            keys_to_remove = [
+                key for key in self._url_cache if key[0] == music_id
+            ]
+            for key in keys_to_remove:
+                del self._url_cache[key]
+
         if deleted:
             logger.info(f"Deleted music: id={music_id}")
         return deleted

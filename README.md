@@ -449,6 +449,7 @@ Special characters are automatically replaced with underscores to ensure cross-p
 │   ├── __init__.py
 │   ├── process/                        # Processing logic
 │   │   ├── __init__.py
+│   │   ├── process_album_info_loader.py  # Shared album info parser
 │   │   ├── process_cloud_music.py      # Core download orchestration
 │   │   ├── process_from_folders.py     # Folder listing and batch processing
 │   │   ├── process_album_artist_fix.py # Album artist tag fixer
@@ -460,7 +461,6 @@ Special characters are automatically replaced with underscores to ensure cross-p
 │   │   ├── util_commons.py             # Common helper functions
 │   │   ├── util_config.py              # Configuration management
 │   │   ├── util_database.py            # SQLite database operations
-│   │   ├── util_file.py                # File operation utilities
 │   │   ├── util_logging.py             # Logging infrastructure
 │   │   ├── util_music_api.py           # Music API client
 │   │   ├── util_music_downloader.py    # Download management

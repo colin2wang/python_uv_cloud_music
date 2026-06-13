@@ -2,6 +2,7 @@
 NetEase Cloud Music API utility class
 """
 
+import json
 import re
 import requests
 from typing import Optional, Dict, Any
@@ -160,7 +161,6 @@ class MusicToolAPI:
 
 def _parse_json_response(response_str: str, operation: str) -> Optional[dict]:
     """Generic JSON parsing function"""
-    import json
     try:
         data = json.loads(response_str)
         if isinstance(data, dict):
@@ -186,7 +186,6 @@ def _handle_429_error(response: requests.Response) -> bool:
 
 def _handle_429_error_json(response_str: str) -> bool:
     """Handle 429 error in JSON response"""
-    import json
     try:
         data = json.loads(response_str)
         if isinstance(data, dict) and '429' in data.get('message', ''):

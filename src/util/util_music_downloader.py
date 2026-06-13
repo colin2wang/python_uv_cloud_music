@@ -22,6 +22,16 @@ from src.util.util_logging import setup_logger
 
 logger = setup_logger(__name__)
 
+AUDIO_FORMAT_MAP = {
+    '.mp3': (ID3, 'mp3'),
+    '.mp2': (ID3, 'mp3'),
+    '.mp1': (ID3, 'mp3'),
+    '.flac': (FLAC, 'flac'),
+    '.m4a': (MP4, 'mp4'),
+    '.mp4': (MP4, 'mp4'),
+    '.aac': (MP4, 'mp4')
+}
+
 
 def _write_audio_metadata(audio_file: Any, metadata: dict, format_type: str) -> None:
     """Write audio metadata based on format"""
@@ -180,17 +190,7 @@ def write_metadata_to_file(file_path: Union[str, Path], metadata: dict) -> bool:
     logger.info(f"Writing metadata to {file_path.name}...")
 
     try:
-        format_map = {
-            '.mp3': (ID3, 'mp3'),
-            '.mp2': (ID3, 'mp3'),
-            '.mp1': (ID3, 'mp3'),
-            '.flac': (FLAC, 'flac'),
-            '.m4a': (MP4, 'mp4'),
-            '.mp4': (MP4, 'mp4'),
-            '.aac': (MP4, 'mp4')
-        }
-        
-        handler_info = format_map.get(ext)
+        handler_info = AUDIO_FORMAT_MAP.get(ext)
         if not handler_info:
             logger.warning(f"Unsupported file format: {ext}")
             return False
@@ -256,17 +256,7 @@ def write_picture_to_file(file_path: Union[str, Path]) -> bool:
     logger.info(f"Writing image to {file_path.name}...")
 
     try:
-        format_map = {
-            '.mp3': (ID3, 'mp3'),
-            '.mp2': (ID3, 'mp3'),
-            '.mp1': (ID3, 'mp3'),
-            '.flac': (FLAC, 'flac'),
-            '.m4a': (MP4, 'mp4'),
-            '.mp4': (MP4, 'mp4'),
-            '.aac': (MP4, 'mp4')
-        }
-        
-        handler_info = format_map.get(ext)
+        handler_info = AUDIO_FORMAT_MAP.get(ext)
         if not handler_info:
             logger.warning(f"Unsupported file format: {ext}")
             return False
@@ -370,7 +360,7 @@ def _build_filename(song_name: str, artist: str, idx: Optional[int] = None) -> s
 
 def _download_with_retry(url: str, timeout: int, reason: str) -> Optional[requests.Response]:
     """Download function with retry mechanism"""
-    max_retries = 2  # Initial request + 1 retry
+    max_retries = config.get_max_retries()
     
     for attempt in range(max_retries):
         try:

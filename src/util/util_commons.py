@@ -256,24 +256,8 @@ def random_sleep(max_delay: float = None, min_delay: float = 1.0, reason: str = 
     if max_delay is None:
         max_delay = config.get_random_delay_max()
     delay = random.uniform(min_delay, max_delay)
-    logger.info(f"Random sleeping for {delay:.2f} seconds (range: {min_delay:.2f}-{max_delay:.2f}s)... (Reason: {reason})")
-    
-    # Show simple text progress during sleep
-    start_time = time.time()
-    end_time = start_time + delay
-    
-    while time.time() < end_time:
-        remaining = end_time - time.time()
-        if remaining > 0:
-            # Display countdown in console
-            print(f"\rWaiting ({reason}): {remaining:.2f}s remaining...", end="", flush=True)
-            time.sleep(min(0.1, remaining))
-        else:
-            break
-    
-    # Clear the line after completion
-    print("\r" + " " * 60 + "\r", end="", flush=True)
-    logger.info(f"Sleep completed.")
+    logger.info(f"Sleeping {delay:.2f}s (range: {min_delay:.2f}-{max_delay:.2f}s) (Reason: {reason})")
+    time.sleep(delay)
 
 
 def ensure_interval(timestamp_key: str, interval: float) -> float:

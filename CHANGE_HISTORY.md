@@ -19,6 +19,18 @@ This document records all significant changes to the Music Library Organizer pro
 
 ---
 
+## 2026-06-13
+
+### Code Quality Optimization — Bug Fixes, Dead Code Removal & DRY Refactoring
+
+Comprehensive code quality improvements across the codebase. Extracted shared `load_album_info()` into `process_album_info_loader.py`, eliminating identical 30-line parsing blocks duplicated in 4 process files. Deleted `util_file.py` which was entirely redundant with `util_commons.py`. Extracted repeated `format_map` dict literals as module-level `AUDIO_FORMAT_MAP` constant. Simplified `random_sleep()` by replacing busy-wait polling loop with a single `time.sleep()` call. Fixed `upsert_batch_urls`, `get_all_music_urls`, and `delete_music` in `util_database.py` which referenced a non-existent `music_url` table — rewritten to use in-memory cache. Fixed `process_album_cover_redownload.py` and `process_album_lyrics_fix.py` calling `.get()` on `AlbumMetadata` model objects. Moved `import json` from function bodies to module top-level in `util_music_api.py`. Changed `_download_with_retry` to use `config.get_max_retries()` instead of hardcoded value.
+
+New files: `src/process/process_album_info_loader.py`.
+Modified files: `src/process/process_album_artist_fix.py`, `process_album_cover_redownload.py`, `process_album_lyrics_fix.py`, `process_album_metadata_fix.py`, `src/util/util_commons.py`, `util_database.py`, `util_music_downloader.py`, `util_music_api.py`.
+Deleted files: `src/util/util_file.py`.
+
+---
+
 ## 2026-06-12
 
 ### Project Structure Refactoring — Source Layout & Package Organization
