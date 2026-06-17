@@ -26,6 +26,10 @@ download:
   # Index format (3 digits: 001, 002, ...)
   index_format: "03d"
 
+  # Subdirectory name inside album/playlist folder for storing songs
+  # Change this to organize downloaded files (e.g., "Audio", "Music", or leave empty "")
+  sub_dir: "TBD"
+
 # Filename Configuration
 filename:
   # Filename pattern: {index} - {artist} - {title}

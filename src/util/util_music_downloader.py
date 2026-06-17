@@ -581,6 +581,13 @@ def prepare_album_folder(album_metadata: dict, download_dir: Optional[str] = Non
         album_folder_path.mkdir(parents=True, exist_ok=True)
         logger.info(f"Created album folder: {album_folder_path}")
 
+        # Create subdirectory for song files (e.g., TBD)
+        sub_dir_name = config.get_sub_dir()
+        song_folder_path = album_folder_path / sub_dir_name if sub_dir_name else album_folder_path
+        song_folder_path.mkdir(parents=True, exist_ok=True)
+        if sub_dir_name:
+            logger.info(f"Created song subdirectory: {song_folder_path}")
+
         # Create album info file
         _create_album_description_file(
             str(album_folder_path), 
@@ -606,8 +613,8 @@ def prepare_album_folder(album_metadata: dict, download_dir: Optional[str] = Non
         if album_cover_url and config.should_write_cover():
             _download_album_cover(str(album_folder_path), album_cover_url)
 
-        logger.info(f"Album folder prepared successfully: {album_folder_path}")
-        return album_folder_path
+        logger.info(f"Album folder prepared successfully: {song_folder_path}")
+        return song_folder_path
 
     except Exception as e:
         logger.error(f"Failed to prepare album folder: {e}")
@@ -738,6 +745,13 @@ def prepare_playlist_folder(playlist_metadata: dict, download_dir: Optional[str]
         playlist_folder_path.mkdir(parents=True, exist_ok=True)
         logger.info(f"Created playlist folder: {playlist_folder_path}")
 
+        # Create subdirectory for song files (e.g., TBD)
+        sub_dir_name = config.get_sub_dir()
+        song_folder_path = playlist_folder_path / sub_dir_name if sub_dir_name else playlist_folder_path
+        song_folder_path.mkdir(parents=True, exist_ok=True)
+        if sub_dir_name:
+            logger.info(f"Created song subdirectory: {song_folder_path}")
+
         # Create playlist info file
         info_file_path = playlist_folder_path / 'playlist_info.txt'
         try:
@@ -782,8 +796,8 @@ def prepare_playlist_folder(playlist_metadata: dict, download_dir: Optional[str]
         except (IOError, OSError) as e:
             logger.error(f"Failed to create playlist ID file: {e}")
 
-        logger.info(f"Playlist folder prepared successfully: {playlist_folder_path}")
-        return playlist_folder_path
+        logger.info(f"Playlist folder prepared successfully: {song_folder_path}")
+        return song_folder_path
 
     except Exception as e:
         logger.error(f"Failed to prepare playlist folder: {e}")

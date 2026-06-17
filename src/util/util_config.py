@@ -107,7 +107,8 @@ class ConfigManager:
                 'default_dir': 'downloads',
                 'default_quality': 'lossless',
                 'add_index_to_filename': True,
-                'index_format': '03d'
+                'index_format': '03d',
+                'sub_dir': 'TBD'
             },
             'filename': {
                 'pattern': '{index} - {artist} - {title}',
@@ -201,6 +202,10 @@ class ConfigManager:
     def get_index_format(self) -> str:
         """Get index format string"""
         return self.get('download.index_format', '03d')
+
+    def get_sub_dir(self) -> str:
+        """Get subdirectory name inside album/playlist folder for song files"""
+        return self.get('download.sub_dir', 'TBD')
     
     def get_filename_pattern(self) -> str:
         """Get filename pattern"""
