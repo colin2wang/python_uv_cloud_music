@@ -720,11 +720,82 @@ def _count_downloaded_songs(download_dir: str) -> Dict[str, int]:
     return dict(ext_counter)
 
 
+def prepare_playlist_folder(playlist_metadata: dict, download_dir: Optional[str] = None) -> Optional[Path]:
+    """Prepare playlist download folder with info files"""
+    try:
+        download_dir = Path(download_dir or config.get_download_dir())
+        
+        playlist_name = playlist_metadata.get('playlist_name', 'Unknown Playlist')
+        playlist_creator = playlist_metadata.get('playlist_creator', 'Unknown Creator')
+        playlist_id = playlist_metadata.get('playlist_id', '')
+        song_count = playlist_metadata.get('song_count', 0)
+
+        safe_playlist_name = clean_filename(playlist_name)
+        safe_creator = clean_filename(playlist_creator)
+        playlist_folder_name = f"{safe_creator} - {safe_playlist_name}"
+            
+        playlist_folder_path = download_dir / playlist_folder_name
+        playlist_folder_path.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Created playlist folder: {playlist_folder_path}")
+
+        # Create playlist info file
+        info_file_path = playlist_folder_path / 'playlist_info.txt'
+        try:
+            lines = [
+                f"Playlist: {playlist_name}",
+                f"Creator: {playlist_creator}",
+                f"Playlist ID: {playlist_id}",
+                f"Song Count: {song_count}",
+                "=" * 60,
+                ""
+            ]
+            with open(info_file_path, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(line for line in lines if line))
+            logger.info(f"Created playlist info file: {info_file_path.name}")
+        except (IOError, OSError) as e:
+            logger.error(f"Failed to create playlist info file: {e}")
+
+        # Create playlist ID file with song list
+        id_file_path = playlist_folder_path / f"{playlist_id}.txt"
+        try:
+            song_details = playlist_metadata.get('song_details', [])
+            lines = [
+                f"Playlist ID: {playlist_id}",
+                f"Playlist: {playlist_name}",
+                f"Creator: {playlist_creator}",
+                "=" * 60,
+                "Songs:"
+            ]
+            if song_details:
+                for song_detail in song_details:
+                    idx = song_detail.get('index', 0)
+                    song_name = song_detail.get('name', 'Unknown')
+                    sid = song_detail.get('id', '')
+                    song_artists = song_detail.get('artists', 'Unknown Artist')
+                    lines.append(f"{idx}. {song_name} - {song_artists} (ID: {sid})")
+            else:
+                lines.append("No song information available")
+
+            with open(id_file_path, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(lines) + '\n')
+            logger.info(f"Created playlist ID file: {id_file_path.name}")
+        except (IOError, OSError) as e:
+            logger.error(f"Failed to create playlist ID file: {e}")
+
+        logger.info(f"Playlist folder prepared successfully: {playlist_folder_path}")
+        return playlist_folder_path
+
+    except Exception as e:
+        logger.error(f"Failed to prepare playlist folder: {e}")
+        return None
+
+
 def _download_songs_from_metadata(metadata: Any,
-                                  index_ids: List[int], level: str, is_album: bool = True) -> None:
+                                  index_ids: List[int], level: str, is_album: bool = True,
+                                  download_dir: Optional[str] = None) -> None:
     """Download songs from metadata"""
     failed_indexes = []
-    
+
     # Ensure index_ids is a list
     if not isinstance(index_ids, list):
         index_ids = []
@@ -732,7 +803,7 @@ def _download_songs_from_metadata(metadata: Any,
     for index, song_detail in enumerate(metadata.song_details):
         song_id = song_detail.get('id')
         song_index = song_detail.get('index', 0)
-        
+
         if not song_id:
             logger.warning(f"Song at index {index} has no ID, skipping...")
             continue
@@ -749,6 +820,7 @@ def _download_songs_from_metadata(metadata: Any,
         song_metadata = get_song_metadata_by_song_id(song_id, level)
         success = download_song_and_resources(
             song_metadata,
+            download_dir=download_dir,
             idx=song_index if is_album else None,
             current_index=index + 1,
             total_count=len(metadata.song_details)
@@ -802,7 +874,8 @@ def download_album(album_id: str, index_ids: List[int] = None, level: Optional[s
             logger.error("Failed to create album folder")
             return False
             
-        _download_songs_from_metadata(album_metadata, index_list, quality, is_album=True)
+        _download_songs_from_metadata(album_metadata, index_list, quality, is_album=True,
+                                      download_dir=str(album_folder))
         return True
         
     except Exception as e:
@@ -828,7 +901,14 @@ def download_playlist(playlist_id: str, index_ids: List[int] = None, level: Opti
             logger.error("Failed to get playlist metadata")
             return False
 
-        _download_songs_from_metadata(playlist_metadata, index_list, quality, is_album=False)
+     # Prepare playlist folder
+        playlist_folder = prepare_playlist_folder(playlist_metadata.to_dict())
+        if not playlist_folder:
+            logger.error("Failed to create playlist folder")
+            return False
+
+        _download_songs_from_metadata(playlist_metadata, index_list, quality, is_album=False,
+                                      download_dir=str(playlist_folder))
         return True
         
     except Exception as e:

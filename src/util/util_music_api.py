@@ -39,7 +39,10 @@ class MusicToolAPI:
     def __init__(self, base_url: str = None):
         self.base_url = (base_url or config.get_api_base_url()).rstrip('/')
         self.session = requests.Session()
+        self.session.verify = False
         self._setup_request_headers()
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     def _setup_request_headers(self) -> None:
         """Set request headers using class constants as base"""
@@ -132,6 +135,14 @@ class MusicToolAPI:
                 timeout=DEFAULT_TIMEOUT
             )
             logger.info("-" * 60)
+            if response.status_code != HTTP_OK:
+                logger.error(f"Playlist API returned status {response.status_code}")
+                if len(response.text) < 500:
+                    logger.error(f"Response: {response.text}")
+                return None
+            if not response.text.strip():
+                logger.error("Playlist API returned empty response")
+                return None
             return _parse_json_response(response.text, "playlist parsing")
         except requests.RequestException as e:
             logger.error(f"Playlist parsing request failed: {e}")

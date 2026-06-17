@@ -10,14 +10,14 @@ logger = setup_logger(__name__)
 def main():
     """Main entry point"""
     # Example usage:
-    download_song("3383993462")
+    # download_song("3383993462")
     
     indexes = []
     # indexes = [4, 6, 15, 18, 19]
     indexes = list(range(11, 13))
     
     # download_album("1505850", indexes)
-    # download_playlist("5453912201", indexes)
+    download_playlist("6851965615", indexes)
 
 
 if __name__ == "__main__":

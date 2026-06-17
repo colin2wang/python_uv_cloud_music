@@ -74,7 +74,11 @@ def get_song_ids_by_playlist_id(playlist_id: str) -> Optional[PlaylistMetadata]:
         return None
 
     playlist_name = playlist_info.get('name', 'Unknown Playlist')
-    playlist_creator = playlist_info.get('creator', {}).get('nickname', 'Unknown Creator')
+    creator_raw = playlist_info.get('creator', 'Unknown Creator')
+    if isinstance(creator_raw, dict):
+        playlist_creator = creator_raw.get('nickname', 'Unknown Creator')
+    else:
+        playlist_creator = str(creator_raw) if creator_raw else 'Unknown Creator'
     song_list = playlist_info.get('tracks', [])
 
     logger.info(f"\nPlaylist parsed successfully!")
