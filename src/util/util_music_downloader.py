@@ -314,8 +314,9 @@ def _extract_file_extension(download_url: str) -> str:
         return ".mp3"
 
 
-def _build_filename(song_name: str, artist: str, idx: Optional[int] = None) -> str:
-    """Build safe filename"""
+def _build_filename(song_name: str, artist: str, idx: Optional[int] = None,
+                     max_length: Optional[int] = None) -> str:
+    """Build safe filename, optionally constrained to max_length characters"""
     safe_song_name = clean_filename(song_name)
     
     if not safe_song_name:
@@ -323,47 +324,52 @@ def _build_filename(song_name: str, artist: str, idx: Optional[int] = None) -> s
         
     add_index = config.should_add_index()
     index_format = config.get_index_format()
-
-    # Check if filename will be too long, and truncate artist name if needed
-    MAX_FILENAME_LENGTH = 200
     
-    def build_with_artist(artists: list) -> str:
-        """Build filename with given artist list"""
+    if max_length is None:
+        max_length = 120
+    
+    def build_with_artist(artists: list, song: str = None) -> str:
+        """Build filename with given artist list and optional truncated song name"""
         safe_artists = [clean_filename(a.strip()) for a in artists if a.strip()]
         artist_str = ', '.join(safe_artists)
+        song_str = song if song is not None else safe_song_name
         
         if idx is not None and add_index:
             formatted_index = f"{idx:{index_format}}"
-            return f"{formatted_index} - {artist_str} - {safe_song_name}"
+            return f"{formatted_index} - {artist_str} - {song_str}"
         else:
-            return f"{artist_str} - {safe_song_name}"
+            return f"{artist_str} - {song_str}"
 
-    # Parse original artist list
     artist_parts = [a.strip() for a in artist.split(',') if a.strip()]
     
-    # Try with all artists first
     filename = build_with_artist(artist_parts)
     
-    # If too long, truncate artist names by keeping fewer artists
-    if len(filename) > MAX_FILENAME_LENGTH:
-        logger.warning(f"Filename too long ({len(filename)} chars), truncating artist list")
-        
-        # Keep only first N artists until filename fits
+    if len(filename) > max_length:
         for i in range(len(artist_parts)):
             truncated_filename = build_with_artist(artist_parts[:i+1])
-            if len(truncated_filename) <= MAX_FILENAME_LENGTH:
+            if len(truncated_filename) <= max_length:
                 filename = truncated_filename
                 break
         
-        # If still too long, fall back to simple truncation
-        if len(filename) > MAX_FILENAME_LENGTH:
+        if len(filename) > max_length:
             formatted_index = f"{idx:{index_format}}" if idx is not None and add_index else ""
-            available_length = MAX_FILENAME_LENGTH - len(formatted_index) - 4 - len(safe_song_name) - 4
-            if artist_parts:
+            available_length = max_length - len(formatted_index) - 4 - len(safe_song_name) - 4
+            if artist_parts and available_length > 0:
                 safe_artist = clean_filename(artist_parts[0])
                 if len(safe_artist) > available_length:
                     safe_artist = safe_artist[:available_length]
                 filename = build_with_artist([safe_artist])
+
+    if len(filename) > max_length:
+        if ' - ' in filename:
+            parts = filename.rsplit(' - ', 1)
+            prefix = parts[0] + ' - '
+        else:
+            prefix = ''
+        available_song_len = max_length - len(prefix)
+        if available_song_len > 10:
+            truncated_song = safe_song_name[:available_song_len]
+            filename = f"{prefix}{truncated_song}"
 
     return filename
 
@@ -406,7 +412,6 @@ def download_song_and_resources(
     total_count: Optional[int] = None
 ) -> bool:
     """Download song and resources (lyrics, cover)"""
-    # Validate metadata
     if not song_metadata:
         logger.error("Invalid song metadata: None")
         return False
@@ -422,7 +427,6 @@ def download_song_and_resources(
         logger.error("No download URL in metadata")
         return False
 
-    # Determine download directory
     download_dir = Path(download_dir or config.get_download_dir())
     try:
         download_dir.mkdir(parents=True, exist_ok=True)
@@ -430,15 +434,33 @@ def download_song_and_resources(
         logger.error(f"Failed to create download directory: {e}")
         return False
 
-    # Build file path
-    filename = _build_filename(data.get('name', 'Unknown'), data.get('ar_name', 'Unknown'), idx)
     file_extension = _extract_file_extension(download_url)
-    
-    music_file_path = download_dir / f"{filename}{file_extension}"
+    song_name = data.get('name', 'Unknown')
+    artist_name = data.get('ar_name', 'Unknown')
+
+    # Try building filename with progressively shorter max_length
+    filename = None
+    music_file_path = None
+    for max_len in [120, 80, 60, 40]:
+        candidate = _build_filename(song_name, artist_name, idx, max_length=max_len)
+        candidate_path = download_dir / f"{candidate}{file_extension}"
+        try:
+            candidate_path.touch()
+            candidate_path.unlink()
+            filename = candidate
+            music_file_path = candidate_path
+            break
+        except OSError:
+            logger.warning(f"Path too long with filename ({len(candidate)} chars), trying shorter...")
+            continue
+
+    if filename is None:
+        logger.error(f"Cannot create file path even with minimal filename")
+        return False
+
     lyric_file_path = download_dir / f"{filename}.lrc"
     cover_file_path = download_dir / f"{filename}.jpg"
 
-    # Skip existing files
     if music_file_path.exists():
         logger.info(f"File already exists, skipping: {music_file_path.name}")
         return True
@@ -449,7 +471,6 @@ def download_song_and_resources(
     logger.info(f"Quality: {song_metadata.get('used_quality', data.get('level', 'unknown'))}")
     logger.info("-" * 60)
 
-    # Download music file
     random_sleep(reason="Before downloading music file")
     response = _download_with_retry(download_url, config.get_timeout(), "music")
     if not response:
@@ -481,13 +502,11 @@ def download_song_and_resources(
         logger.error(f"Failed to write music file: {e}")
         return False
 
-    # Prepare metadata for tagging
     metadata_for_tagging = dict(data)
     metadata_for_tagging['cover_path'] = str(cover_file_path) if cover_file_path.exists() else ''
     if idx is not None:
         metadata_for_tagging['track_number'] = str(idx)
 
-    # Write metadata to file if configured
     if config.should_write_metadata():
         logger.info("\nWriting metadata...")
         if not write_metadata_to_file(music_file_path, metadata_for_tagging):
@@ -496,7 +515,6 @@ def download_song_and_resources(
                 if write_metadata_to_file(music_file_path, metadata_for_tagging):
                     break
 
-    # Save lyrics to file if configured
     lyric = data.get('lyric', '')
     if lyric and config.should_write_lyrics():
         logger.info("Saving lyrics...")
@@ -507,7 +525,6 @@ def download_song_and_resources(
         except (IOError, OSError) as e:
             logger.warning(f"Lyrics saving failed: {e}")
 
-    # Download cover image if configured and available
     cover_url = data.get('pic', '')
     if cover_url and config.should_write_cover():
         logger.info("Downloading cover...")
@@ -521,7 +538,6 @@ def download_song_and_resources(
             except (IOError, OSError) as e:
                 logger.warning(f"Cover saving failed: {e}")
 
-    # Add music cover to song file if configured
     if config.should_write_cover():
         logger.info("Adding cover to song file...")
         write_picture_to_file(music_file_path)
